@@ -74,7 +74,7 @@ cases(
 )
 $
 
-== Frequent Memory Allocation and Deallocations
+== Introductions and Eliminations
 
 
 
