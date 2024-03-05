@@ -255,6 +255,210 @@ numpages = {2},
 keywords = {LISP, compact list, garbage collection, list compacting}
 }
 
+@inproceedings{perceus,
+author = {Reinking, Alex and Xie, Ningning and de Moura, Leonardo and Leijen, Daan},
+title = {Perceus: garbage free reference counting with reuse},
+year = {2021},
+isbn = {9781450383912},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3453483.3454032},
+doi = {10.1145/3453483.3454032},
+abstract = {We introduce Perceus, an algorithm for precise reference counting with reuse and specialization. Starting from a functional core language with explicit control-flow, Perceus emits precise reference counting instructions such that (cycle-free) programs are _garbage free_, where only live references are retained. This enables further optimizations, like reuse analysis that allows for guaranteed in-place updates at runtime. This in turn enables a novel programming paradigm that we call _functional but in-place_ (FBIP). Much like tail-call optimization enables writing loops with regular function calls, reuse analysis enables writing in-place mutating algorithms in a purely functional way. We give a novel formalization of reference counting in a linear resource calculus, and prove that Perceus is sound and garbage free. We show evidence that Perceus, as implemented in Koka, has good performance and is competitive with other state-of-the-art memory collectors.},
+booktitle = {Proceedings of the 42nd ACM SIGPLAN International Conference on Programming Language Design and Implementation},
+pages = {96–111},
+numpages = {16},
+keywords = {Reference Counting, Handlers, Algebraic Effects},
+location = {Virtual, Canada},
+series = {PLDI 2021}
+}
+
+@article{frame-limited,
+author = {Lorenzen, Anton and Leijen, Daan},
+title = {Reference counting with frame limited reuse},
+year = {2022},
+issue_date = {August 2022},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {6},
+number = {ICFP},
+url = {https://doi.org/10.1145/3547634},
+doi = {10.1145/3547634},
+abstract = {The recently introduced _Perceus_ algorithm can automatically insert  
+reference count instructions such that the resulting (cycle-free) program is  
+_garbage free_: objects are freed at the very moment they can no longer be  
+referenced. An important extension is reuse analysis. This optimization pairs  
+objects of known size with fresh allocations of the same size and tries to  
+reuse the object in-place at runtime if it happens to be unique. Unfortunately,  
+current implementations of reuse analysis are fragile with respect to small  
+program transformations, or can cause an arbitrary increase in the peak heap  
+usage. We present a novel _drop-guided_ reuse algorithm that is simpler and  
+more robust than previous approaches. Moreover, we generalize the linear  
+resource calculus to precisely characterize garbage-free and frame-limited  
+evaluations. On each function call, a frame-limited evaluation may hold on to  
+memory longer if the size is bounded by a constant factor. Using this framework  
+we show that our drop-guided reuse _is_ frame-limited and find that an  
+implementation of our new reuse approach in Koka can provide significant  
+speedups.},
+journal = {Proc. ACM Program. Lang.},
+month = {aug},
+articleno = {103},
+numpages = {24},
+keywords = {Frame Limited, Koka, Reference Counting, Reuse}
+}
+
+@inproceedings{lean-4,
+  author = {Moura, Leonardo de
+and Ullrich, Sebastian},
+  editor = {Platzer, Andr{\'e}
+and Sutcliffe, Geoff},
+  title = {The Lean 4 Theorem Prover and Programming Language},
+  booktitle = {Automated Deduction -- CADE 28},
+  year = {2021},
+  publisher = {Springer International Publishing},
+  address = {Cham},
+  pages = {625--635},
+  isbn = {978-3-030-79876-5},
+  documenturl = {https://leanprover.github.io/papers/lean4.pdf}
+}
+
+@inproceedings{lxr,
+author = {Zhao, Wenyu and Blackburn, Stephen M. and McKinley, Kathryn S.},
+title = {Low-latency, high-throughput garbage collection},
+year = {2022},
+isbn = {9781450392655},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3519939.3523440},
+doi = {10.1145/3519939.3523440},
+abstract = {To achieve short pauses, state-of-the-art concurrent copying collectors such as C4, Shenandoah, and ZGC use substantially more CPU cycles and memory than simpler collectors. They suffer from design limitations: i) concurrent copying with inherently expensive read and write barriers, ii) scalability limitations due to tracing, and iii) immediacy limitations for mature objects that impose memory overheads.  
+
+This paper takes a different approach to optimizing responsiveness and throughput. It uses the insight that regular, brief stop-the-world collections deliver sufficient responsiveness at greater efficiency than concurrent evacuation. It introduces LXR, where stop-the-world collections use reference counting (RC) and judicious copying. RC delivers scalability and immediacy, promptly reclaiming young and mature objects. RC, in a hierarchical Immix heap structure, reclaims most memory without any copying. Occasional concurrent tracing identifies cyclic garbage. LXR introduces: i) RC remembered sets for judicious copying of mature objects; ii) a novel low-overhead write barrier that combines coalescing reference counting, concurrent tracing, and remembered set maintenance; iii) object reclamation while performing a concurrent trace; iv) lazy processing of decrements; and v) novel survival rate triggers that modulate pause durations.  
+
+LXR combines excellent responsiveness and throughput, improving over production collectors. On the widely-used Lucene search engine in a tight heap, LXR delivers 7.8\texttimes{} better throughput and 10\texttimes{} better 99.99\% tail latency than Shenandoah. On 17 diverse modern workloads in a moderate heap, LXR outperforms OpenJDK’s default G1 on throughput by 4\% and Shenandoah by 43\%.},
+booktitle = {Proceedings of the 43rd ACM SIGPLAN International Conference on Programming Language Design and Implementation},
+pages = {76–91},
+numpages = {16},
+keywords = {Garbage collection, Reference counting},
+location = {San Diego, CA, USA},
+series = {PLDI 2022}
+}
+
+@inproceedings{immix,
+author = {Blackburn, Stephen M. and McKinley, Kathryn S.},
+title = {Immix: a mark-region garbage collector with space efficiency, fast collection, and mutator performance},
+year = {2008},
+isbn = {9781595938602},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1375581.1375586},
+doi = {10.1145/1375581.1375586},
+abstract = {Programmers are increasingly choosing managed languages for modern applications, which tend to allocate many short-to-medium lived small objects. The garbage collector therefore directly determines program performance by making a classic space-time tradeoff that seeks to provide space efficiency, fast reclamation, and mutator performance. The three canonical tracing garbage collectors: semi-space, mark-sweep, and mark-compact each sacrifice one objective. This paper describes a collector family, called mark-region, and introduces opportunistic defragmentation, which mixes copying and marking in a single pass. Combining both, we implement immix, a novel high performance garbage collector that achieves all three performance objectives. The key insight is to allocate and reclaim memory in contiguous regions, at a coarse block grain when possible and otherwise in groups of finer grain lines. We show that immix outperforms existing canonical algorithms, improving total application performance by 7 to 25\% on average across 20 benchmarks. As the mature space in a generational collector, immix matches or beats a highly tuned generational collector, e.g. it improves jbb2000 by 5\%. These innovations and the identification of a new family of collectors open new opportunities for garbage collector design.},
+booktitle = {Proceedings of the 29th ACM SIGPLAN Conference on Programming Language Design and Implementation},
+pages = {22–32},
+numpages = {11},
+keywords = {sweep-to-region, sweep-to-free-list, semi-space, mark-sweep, mark-region, locality, immix, free-list, fragmentation, compaction},
+location = {Tucson, AZ, USA},
+series = {PLDI '08}
+}
+
+@article{hoas,
+author = {Pfenning, F. and Elliott, C.},
+title = {Higher-order abstract syntax},
+year = {1988},
+issue_date = {July 1988},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {23},
+number = {7},
+issn = {0362-1340},
+url = {https://doi.org/10.1145/960116.54010},
+doi = {10.1145/960116.54010},
+abstract = {We describe motivation, design, use, and implementation of higher-order abstract syntax as a central representation for programs, formulas, rules, and other syntactic objects in program manipulation and other formal systems where matching and substitution or unification are central operations. Higher-order abstract syntax incorporates name binding information in a uniform and language generic way. Thus it acts as a powerful link integrating diverse tools in such formal environments. We have implemented higher-order abstract syntax, a supporting matching and unification algorithm, and some clients in Common Lisp in the framework of the Ergo project at Carnegie Mellon University.},
+journal = {SIGPLAN Not.},
+month = {jun},
+pages = {199–208},
+numpages = {10}
+}
+
+@inproceedings{linear,
+  title={Linear Types can Change the World!},
+  author={Philip Wadler},
+  booktitle={Programming Concepts and Methods},
+  year={1990},
+  url={https://api.semanticscholar.org/CorpusID:58535510}
+}
+
+@Book{hottbook,
+  author =    {The {Univalent Foundations Program}},
+  title =     {Homotopy Type Theory: Univalent Foundations of Mathematics},
+  publisher = {\url{https://homotopytypetheory.org/book}},
+  address =   {Institute for Advanced Study},
+  year =      2013}
+
+@inproceedings{substructural,
+
+  author={Pfenning, Frank and Simmons, Robert J.},
+
+  booktitle={2009 24th Annual IEEE Symposium on Logic In Computer Science}, 
+
+  title={Substructural Operational Semantics as Ordered Logic Programming}, 
+
+  year={2009},
+
+  volume={},
+
+  number={},
+
+  pages={101-110},
+
+  keywords={Logic programming;Computer languages;Computer science;Parallel processing;Greedy algorithms;Calculus},
+
+  doi={10.1109/LICS.2009.8}}
+
+@article{fp2,
+author = {Lorenzen, Anton and Leijen, Daan and Swierstra, Wouter},
+title = {FP²: Fully in-Place Functional Programming},
+year = {2023},
+issue_date = {August 2023},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {7},
+number = {ICFP},
+url = {https://doi.org/10.1145/3607840},
+doi = {10.1145/3607840},
+abstract = {As functional programmers we always face a dilemma: should we write purely  
+functional code, or sacrifice purity for efficiency and resort to in-place  
+updates? This paper identifies precisely when we can have the best of both  
+worlds: a wide class of purely functional programs can be executed safely using  
+in-place updates without requiring allocation, provided their arguments are not  
+shared elsewhere.  
+
+We describe a linear _fully in-place_ (FIP) calculus where we prove that we can  
+always execute such functions in a way that requires no (de)allocation and uses  
+constant stack space. Of course, such a calculus is only relevant if we can  
+express interesting algorithms; we provide numerous examples of in-place  
+functions on datastructures such as splay trees or finger trees, together with  
+in-place versions of merge sort and quick sort.  
+
+We also show how we can generically derive a map function over _any_ polynomial  
+data type that is fully in-place. Finally, we have implemented the rules of the  
+FIP calculus in the Koka language. Using the Perceus reference counting garbage  
+collection, this implementation dynamically executes FIP functions in-place  
+whenever possible.},
+journal = {Proc. ACM Program. Lang.},
+month = {aug},
+articleno = {198},
+numpages = {30},
+keywords = {FBIP, Tail Recursion Modulo Cons}
+}
+  
+
+
+  
+
+
+
 
   
 
