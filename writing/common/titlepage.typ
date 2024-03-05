@@ -27,7 +27,7 @@
   
   // --- Title Page ---
   v(1cm)
-  align(center, image("../figures/ur-logo.png", width: 33%))
+  align(center, image("../figures/ur-logo.svg", width: 33%))
 
   v(5mm)
   align(center, text(font: sans-font, 2em, weight: 700, "University of Rochester"))
