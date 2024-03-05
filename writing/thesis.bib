@@ -4,3 +4,59 @@
 	year = {2009},
 	publisher = {Prentice Hall}
 }
+@misc{terence_tao_lean_tour,
+	title = {A slightly longer {Lean 4} proof tour},
+	author = {Tao, Terence},
+	url = {https://terrytao.wordpress.com/2023/12/05/a-slightly-longer-lean-4-proof-tour/},
+	year = {2023}
+}
+@misc{Fermat_last_theorem,
+	title = {{Fermat's Last Theorem} for regular primes},
+	author = {LeanProver Community},
+	url = {https://leanprover-community.github.io/flt-regular/blueprint/},
+	year = {2024}
+}
+@article{Leroy-Compcert-CACM,
+  author = {Xavier Leroy},
+  title = {Formal verification of a realistic compiler},
+  journal = {Communications of the ACM},
+  year = 2009,
+  volume = 52,
+  number = 7,
+  pages = {107--115},
+  url = {http://xavierleroy.org/publi/compcert-CACM.pdf},
+  urlpublisher = {http://doi.acm.org/10.1145/1538788.1538814},
+  hal = {http://hal.archives-ouvertes.fr/inria-00415861/},
+  pubkind = {journal-int-mono},
+  abstract = {This paper reports on the development and formal verification (proof
+of semantic preservation) of CompCert, a compiler from Clight (a
+large subset of the C programming language) to PowerPC assembly code,
+using the Coq proof assistant both for programming the compiler and
+for proving its correctness.  Such a verified compiler is useful in
+the context of critical software and its formal verification: the
+verification of the compiler guarantees that the safety properties
+proved on the source code hold for the executable compiled code as
+well.}
+}
+
+@article{composable-verification,
+author = {Zhang, Ling and Wang, Yuting and Wu, Jinhua and Koenig, J\'{e}r\'{e}mie and Shao, Zhong},
+title = {Fully Composable and Adequate Verified Compilation with Direct Refinements between Open Modules},
+year = {2024},
+issue_date = {January 2024},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {8},
+number = {POPL},
+url = {https://doi.org/10.1145/3632914},
+doi = {10.1145/3632914},
+abstract = {Verified compilation of open modules (i.e., modules whose functionality depends on other modules) provides a foundation for end-to-end verification of modular programs ubiquitous in contemporary software. However, despite intensive investigation in this topic for decades,the proposed approaches are still difficult to use in practice as they rely on assumptions about the internal working of compilers which make it difficult for external users to apply the verification results. We propose an approach to verified compositional compilation without such assumptions in the setting of verifying compilation of heterogeneous modules written in first-order languages supporting global memory and pointers. Our approach is based on the memory model of CompCert and a new discovery that a Kripke relation with a notion of memory protection can serve as a uniform and composable semantic interface for the compiler passes. By absorbing the rely-guarantee conditions on memory evolution for all compiler passes into this Kripke Memory Relation and by piggybacking requirements on compiler optimizations onto it, we get compositional correctness theorems for realistic optimizing compilers as refinements that directly relate native semantics of open modules and that are ignorant of intermediate compilation processes. Such direct refinements support all the compositionality and adequacy properties essential for verified compilation of open modules. We have applied this approach to the full compilation chain of CompCert with its Clight source language and demonstrated that our compiler correctness theorem is open to composition and intuitive to use with reduced verification complexity through end-to-end verification of non-trivial heterogeneous modules that may freely invoke each other (e.g.,mutually recursively).},
+journal = {Proc. ACM Program. Lang.},
+month = {jan},
+articleno = {72},
+numpages = {31},
+keywords = {Direct Refinements, Kripke Relations, Verified Compositional Compilation}
+}
+
+  
+
