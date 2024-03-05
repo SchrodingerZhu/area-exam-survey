@@ -41,9 +41,8 @@ The memory resources of functional languages are typically managed by garbage co
 
 This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new RC-based methods. Furthermore, this work will suggest potential enhancements to address existing challenges in reuse analysis and the RC-based runtime framework.
 
-= Background
-== Functional Programming
-
+= Functional Programming
+== A Brief Overview
 Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: for example, values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
 
 However, programming within an immutable framework requires a paradigm shift from traditional imperative programming. Data structures in functional languages are typically built inductively, following an algebraic approach @construction @Pfenning2018. A functional programming language might start with simple built-in types like natural numbers and boolean values, then construct new types as combinations or variations of existing ones. For instance, a `List` structure in Lean 4 could be defined as:
@@ -53,6 +52,31 @@ inductive List : Type :=
   | Cons (hd : Nat) (tl : List)
 ```
 Here, `List` represents a sum type of `Nil` and `Cons`, with `Cons` being a product type combining `Nat` and `List`.
+
+Given this construction, it's important to note that operations on functional data structures can be defined as functions in the mathematical sense. Consider the following red-black tree in Haskell from @algoxy:
+```hs
+data Color = R | B | BB
+data RBTree = Empty | Node Color RBTree Int RBTree
+```
+Assume that tree is represented as tuples aliased as type $TT$, $phi$ is a function that rebalance doubly blacked nodes and $mu$ is a function that blackens a node. Within this structure, the deletion operation can be articulated in terms of mathematical functions. 
+$
+f &: ZZ times TT -> TT\
+f(x, t) &= 
+cases(
+  emptyset\, & t = emptyset,
+  phi(C, f(x, l), k, r)\, & t = (C, l, k, r) and x < k,
+  phi(C, l, k, f(x, r))\, & t = (C, l, k, r) and x > k,
+  r\, & t = (C, l, k, r) and x = k and l = emptyset and C != B,
+  mu(r)\, & t = (C, l, k, r) and x = k and l = emptyset and C = B,
+  l\, & t = (C, l, k, r) and x = k and r = emptyset and C != B,
+  mu(l)\, & t = (C, l, k, r) and x = k and r = emptyset and C = B,
+  phi(C, l, m, (f, min(r), r))\, &"otherwise"
+)
+$
+
+== Frequent Memory Allocation and Deallocations
+
+
 
 == e.g. User Feedback
 #rect(
