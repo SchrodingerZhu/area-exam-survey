@@ -21,7 +21,7 @@
   submissionDate: submissionDate
 )
 
-#acknowledgement()
+// #acknowledgement()
 
 #abstract_en()
 
