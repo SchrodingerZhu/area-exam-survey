@@ -44,17 +44,15 @@ This work examines the characteristics of functional programming alongside previ
 = Background
 == Functional Programming
 
-Functional programming usually refers to the paradigm that expresses programs in lambda expressions and models computation as $beta$-reductions or normalizations of the lambda terms. In a purely functional setting, there is no side-effect associated with such evaluation, where programs can be treated as "functions" in the mathematical sence @pragmatics. In many scenarios, functional programming brings ease to tackle hard problems: for instances, the values are naturally persistent @advanced-data-structures, the immutability avoids data race in concurrent programming, and the lambda calculi captures the essence of constructive proofs @proofs-as-programs.
+Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: for example, values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
 
-However, programming without mutability demands a different mindset compared to imperative programming. Data structures in functional languages are usually constructed inductively in an algebraic approach @construction @Pfenning2018. A fucntional programming language may begin with some simple builtin types such that natural numbers and boolean values. New types are formed as products or sums of existing types.
-
-For example, a `List` of  structure in Lean 4 may be defined as
+However, programming within an immutable framework requires a paradigm shift from traditional imperative programming. Data structures in functional languages are typically built inductively, following an algebraic approach @construction @Pfenning2018. A functional programming language might start with simple built-in types like natural numbers and boolean values, then construct new types as combinations or variations of existing ones. For instance, a `List` structure in Lean 4 could be defined as:
 ```lean
 inductive List : Type :=
   | Nil 
   | Cons (hd : Nat) (tl : List)
 ```
-where `List` is the sum type of `Nil` and `Cons`, and `Cons` is a product of `Nat` and `List`.
+Here, `List` represents a sum type of `Nil` and `Cons`, with `Cons` being a product type combining `Nat` and `List`.
 
 == e.g. User Feedback
 #rect(
