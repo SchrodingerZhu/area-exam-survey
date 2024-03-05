@@ -57,6 +57,210 @@ articleno = {72},
 numpages = {31},
 keywords = {Direct Refinements, Kripke Relations, Verified Compositional Compilation}
 }
+@article{10.1145/173262.155107,
+author = {Grunwald, Dirk and Zorn, Benjamin and Henderson, Robert},
+title = {Improving the cache locality of memory allocation},
+year = {1993},
+issue_date = {June 1993},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {28},
+number = {6},
+issn = {0362-1340},
+url = {https://doi.org/10.1145/173262.155107},
+doi = {10.1145/173262.155107},
+abstract = {The allocation and disposal of memory is a ubiquitous operation in most programs. Rarely do programmers concern themselves with details of memory allocators; most assume that memory allocators provided by the system perform well. This paper presents a performance evaluation of the reference locality of dynamic storage allocation algorithms based on trace-driven simualtion of five large allocation-intensive C programs. In this paper, we show how the design of a memory allocator can significantly affect the reference locality for various applications. Our measurements show that poor locality in sequential-fit allocation algorithms reduces program performance, both by increasing paging and cache miss rates. While increased paging can be debilitating on any architecture, cache misses rates are also important for modern computer architectures. We show that algorithms attempting to be space-efficient by coalescing adjacent free objects show poor reference locality, possibly negating the benefits of space efficiency. At the other extreme, algorithms can expend considerable effort to increase reference locality yet gain little in total execution performance. Our measurements suggest an allocator design that is both very fast and has good locality of reference.},
+journal = {SIGPLAN Not.},
+month = {jun},
+pages = {177–186},
+numpages = {10}
+}
+
+@inproceedings{locality-alloc,
+author = {Grunwald, Dirk and Zorn, Benjamin and Henderson, Robert},
+title = {Improving the cache locality of memory allocation},
+year = {1993},
+isbn = {0897915984},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/155090.155107},
+doi = {10.1145/155090.155107},
+abstract = {The allocation and disposal of memory is a ubiquitous operation in most programs. Rarely do programmers concern themselves with details of memory allocators; most assume that memory allocators provided by the system perform well. This paper presents a performance evaluation of the reference locality of dynamic storage allocation algorithms based on trace-driven simualtion of five large allocation-intensive C programs. In this paper, we show how the design of a memory allocator can significantly affect the reference locality for various applications. Our measurements show that poor locality in sequential-fit allocation algorithms reduces program performance, both by increasing paging and cache miss rates. While increased paging can be debilitating on any architecture, cache misses rates are also important for modern computer architectures. We show that algorithms attempting to be space-efficient by coalescing adjacent free objects show poor reference locality, possibly negating the benefits of space efficiency. At the other extreme, algorithms can expend considerable effort to increase reference locality yet gain little in total execution performance. Our measurements suggest an allocator design that is both very fast and has good locality of reference.},
+booktitle = {Proceedings of the ACM SIGPLAN 1993 Conference on Programming Language Design and Implementation},
+pages = {177–186},
+numpages = {10},
+location = {Albuquerque, New Mexico, USA},
+series = {PLDI '93}
+}
+
+@techreport{leijen2019mimalloc,
+author = {Leijen, Daan and Zorn, Ben and de Moura, Leonardo},
+title = {Mimalloc: Free List Sharding in Action},
+institution = {Microsoft},
+year = {2019},
+month = {June},
+abstract = {Modern memory allocators have to balance many simultaneous demands,
+including performance, security, the presence of concurrency, and
+application-specific demands depending on the context of their use. One
+increasing use-case for allocators is as back-end implementations of
+languages, such as Swift and Python, that use reference counting to
+automatically deallocate objects. We present mimalloc, a memory allocator
+that effectively balances these demands, shows significant performance
+advantages over existing allocators, and is tailored to support languages
+that rely on the memory allocator as a backend for reference counting.
+Mimalloc combines several innovations to achieve this result. First, it
+uses three page-local sharded free lists to increase locality, avoid
+contention, and support a highly-tuned allocate and free fast path. These
+free lists also support *temporal cadence*, which allows the allocator to
+predictably leave the fast path for regular maintenance tasks such as
+supporting deferred freeing, handling frees from non-local threads, etc.
+While influenced by the allocation workload of the reference-counted Lean
+and Koka programming language, we show that mimalloc has superior
+performance to modern commercial memory allocators, including tcmalloc
+and jemalloc, with speed improvements of 7% and 14%, respectively, on
+redis, and consistently out performs over a wide range of sequential and
+concurrent benchmarks. Allocators tailored to provide an efficient
+runtime for reference-counting languages reduce the implementation burden
+on developers and encourage the creation of innovative new language
+designs.},
+url = {https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/},
+number = {MSR-TR-2019-18},
+}
+
+@inproceedings{snmalloc,
+author = {Li\'{e}tar, Paul and Butler, Theodore and Clebsch, Sylvan and Drossopoulou, Sophia and Franco, Juliana and Parkinson, Matthew J. and Shamis, Alex and Wintersteiger, Christoph M. and Chisnall, David},
+title = {snmalloc: a message passing allocator},
+year = {2019},
+isbn = {9781450367226},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3315573.3329980},
+doi = {10.1145/3315573.3329980},
+abstract = {snmalloc is an implementation of malloc aimed at workloads in which objects are typically deallocated by a different thread than the one that had allocated them. We use the term producer/consumer for such workloads. snmalloc uses a novel message passing scheme which returns deallocated objects to the originating allocator in batches without taking any locks. It also uses a novel bump pointer-free list data structure with which just 64-bits of meta-data are sufficient for each 64 KiB slab. On such producer/consumer benchmarks our approach performs better than existing allocators. Snmalloc is available at <a href="https://github.com/Microsoft/snmalloc">https://github.com/Microsoft/snmalloc</a>.},
+booktitle = {Proceedings of the 2019 ACM SIGPLAN International Symposium on Memory Management},
+pages = {122–135},
+numpages = {14},
+keywords = {message passing, Memory allocation},
+location = {Phoenix, AZ, USA},
+series = {ISMM 2019}
+}
+
+@inproceedings{haskell,
+author = {Marlow, Simon and Harris, Tim and James, Roshan P. and Peyton Jones, Simon},
+title = {Parallel generational-copying garbage collection with a block-structured heap},
+year = {2008},
+isbn = {9781605581347},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1375634.1375637},
+doi = {10.1145/1375634.1375637},
+abstract = {We present a parallel generational-copying garbage collector implemented for the Glasgow Haskell Compiler. We use a block-structured memory allocator, which provides a natural granularity for dividing the work of GC between many threads, leading to a simple yet effective method for parallelising copying GC. The results are encouraging: we demonstrate wall-clock speedups of on average a factor of 2 in GC time on a commodity 4-core machine with no programmer intervention, compared to our best sequential GC.},
+booktitle = {Proceedings of the 7th International Symposium on Memory Management},
+pages = {11–20},
+numpages = {10},
+keywords = {parallel garbage collection},
+location = {Tucson, AZ, USA},
+series = {ISMM '08}
+}
+
+@inproceedings{ocaml-pm,
+author = {Marlow, Simon and Harris, Tim and James, Roshan P. and Peyton Jones, Simon},
+title = {Parallel generational-copying garbage collection with a block-structured heap},
+year = {2008},
+isbn = {9781605581347},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1375634.1375637},
+doi = {10.1145/1375634.1375637},
+abstract = {We present a parallel generational-copying garbage collector implemented for the Glasgow Haskell Compiler. We use a block-structured memory allocator, which provides a natural granularity for dividing the work of GC between many threads, leading to a simple yet effective method for parallelising copying GC. The results are encouraging: we demonstrate wall-clock speedups of on average a factor of 2 in GC time on a commodity 4-core machine with no programmer intervention, compared to our best sequential GC.},
+booktitle = {Proceedings of the 7th International Symposium on Memory Management},
+pages = {11–20},
+numpages = {10},
+keywords = {parallel garbage collection},
+location = {Tucson, AZ, USA},
+series = {ISMM '08}
+}
+
+@inproceedings{ocaml,
+author = {Doligez, Damien and Gonthier, Georges},
+title = {Portable, unobtrusive garbage collection for multiprocessor systems},
+year = {1994},
+isbn = {0897916360},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/174675.174673},
+doi = {10.1145/174675.174673},
+abstract = {We describe and prove the correctness of a new concurrent mark-and-sweep garbage collection algorithm. This algorithm derives from the classical on-the-fly algorithm from Dijkstra et al. [9]. A distinguishing feature of our algorithm is that it supports multiprocessor environments where the registers of running processes are not readily accessible, without imposing any overhead on the elementary operations of loading a register or reading or initializing a field. Furthermore our collector never blocks running mutator processes except possibly on requests for free memory; in particular, updating a field or creating or marking or sweeping a heap object does not involve system-dependent synchronization primitives such as locks. We also provide support for process creation and deletion, and for managing an extensible heap of variable-sized objects.},
+booktitle = {Proceedings of the 21st ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+pages = {70–83},
+numpages = {14},
+location = {Portland, Oregon, USA},
+series = {POPL '94}
+}
+
+@inproceedings{10.1145/800020.808261,
+author = {Ungar, David},
+title = {Generation Scavenging: A non-disruptive high performance storage reclamation algorithm},
+year = {1984},
+isbn = {0897911318},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/800020.808261},
+doi = {10.1145/800020.808261},
+abstract = {Many interactive computing environments provide automatic storage reclamation and virtual memory to ease the burden of managing storage. Unfortunately, many storage reclamation algorithms impede interaction with distracting pauses. Generation Scavenging is a reclamation algorithm that has no noticeable pauses, eliminates page faults for transient objects, compacts objects without resorting to indirection, and reclaims circular structures, in one third the time of traditional approaches.We have incorporated Generation Scavenging in Berkeley Smalltalk(BS), our Smalltalk-80 implementation, and instrumented it to obtain performance data. We are also designing a microprocessor with hardware support for Generation Scavenging.},
+booktitle = {Proceedings of the First ACM SIGSOFT/SIGPLAN Software Engineering Symposium on Practical Software Development Environments},
+pages = {157–167},
+numpages = {11},
+keywords = {Generation, Grabage collection, Personnel computer, Real time, Scavenge, Smalltalk, Virtual memory, Workstation},
+series = {SDE 1}
+}
+
+
+@article{erlang-1,
+author = {Ungar, David},
+title = {Generation Scavenging: A non-disruptive high performance storage reclamation algorithm},
+year = {1984},
+issue_date = {May 1984},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {19},
+number = {5},
+issn = {0362-1340},
+url = {https://doi.org/10.1145/390011.808261},
+doi = {10.1145/390011.808261},
+abstract = {Many interactive computing environments provide automatic storage reclamation and virtual memory to ease the burden of managing storage. Unfortunately, many storage reclamation algorithms impede interaction with distracting pauses. Generation Scavenging is a reclamation algorithm that has no noticeable pauses, eliminates page faults for transient objects, compacts objects without resorting to indirection, and reclaims circular structures, in one third the time of traditional approaches.We have incorporated Generation Scavenging in Berkeley Smalltalk(BS), our Smalltalk-80 implementation, and instrumented it to obtain performance data. We are also designing a microprocessor with hardware support for Generation Scavenging.},
+journal = {SIGPLAN Not.},
+month = {apr},
+pages = {157–167},
+numpages = {11},
+keywords = {Generation, Grabage collection, Personnel computer, Real time, Scavenge, Smalltalk, Virtual memory, Workstation}
+}
+
+@article{erlang-2,
+author = {Cheney, C. J.},
+title = {A nonrecursive list compacting algorithm},
+year = {1970},
+issue_date = {Nov 1970},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {13},
+number = {11},
+issn = {0001-0782},
+url = {https://doi.org/10.1145/362790.362798},
+doi = {10.1145/362790.362798},
+abstract = {A simple nonrecursive list structure compacting scheme or garbage collector suitable for both compact and LISP-like list structures is presented. The algorithm avoids the need for recursion by using the partial structure as it is built up to keep track of those lists that have been copied.},
+journal = {Commun. ACM},
+month = {nov},
+pages = {677–678},
+numpages = {2},
+keywords = {LISP, compact list, garbage collection, list compacting}
+}
+
+
+  
+
+
+
 
   
 
