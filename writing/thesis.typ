@@ -42,7 +42,19 @@ The memory resources of functional languages are typically managed by garbage co
 This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new RC-based methods. Furthermore, this work will suggest potential enhancements to address existing challenges in reuse analysis and the RC-based runtime framework.
 
 = Background
-== Functional Programming Languages and Typical Patterns
+== Functional Programming
+
+Functional programming usually refers to the paradigm that expresses programs in lambda expressions and models computation as $beta$-reductions or normalizations of the lambda terms. In a purely functional setting, there is no side-effect associated with such evaluation, where programs can be treated as "functions" in the mathematical sence @pragmatics. In many scenarios, functional programming brings ease to tackle hard problems: for instances, the values are naturally persistent @advanced-data-structures, the immutability avoids data race in concurrent programming, and the lambda calculi captures the essence of constructive proofs @proofs-as-programs.
+
+However, programming without mutability demands a different mindset compared to imperative programming. Data structures in functional languages are usually constructed inductively in an algebraic approach @construction @Pfenning2018. A fucntional programming language may begin with some simple builtin types such that natural numbers and boolean values. New types are formed as products or sums of existing types.
+
+For example, a `List` of  structure in Lean 4 may be defined as
+```lean
+inductive List : Type :=
+  | Nil 
+  | Cons (hd : Nat) (tl : List)
+```
+where `List` is the sum type of `Nil` and `Cons`, and `Cons` is a product of `Nat` and `List`.
 
 == e.g. User Feedback
 #rect(
