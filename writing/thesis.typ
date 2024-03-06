@@ -45,7 +45,7 @@ This work examines the characteristics of functional programming alongside previ
 == A Brief Overview
 Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: for example, values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
 
-However, programming within an immutable framework requires a paradigm shift from traditional imperative programming. Data structures in functional languages are typically built inductively, following an algebraic approach @construction @Pfenning2018. A functional programming language might start with simple built-in types like natural numbers and boolean values, then construct new types as combinations or variations of existing ones. For instance, a `List` structure in Lean 4 could be defined as:
+However, programming within an immutable framework requires a paradigm shift from traditional imperative programming. Data structures in functional languages are typically built inductively, following an algebraic approach @construction @Pfenning2018 @hottbook. A functional programming language might start with simple built-in types like natural numbers and boolean values, then construct new types as combinations or variations of existing ones. For instance, a `List` structure in Lean 4 could be defined as:
 ```lean
 inductive List : Type :=
   | Nil 
@@ -76,6 +76,27 @@ $
 
 == Introductions and Eliminations
 
+In order to effectively reason about these inductively defined data structures, functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. Introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
+
+The operations that manipulate these data structures rely heavily on the application of these rules. In the subsequent section, we will explore two additional case studies that illustrate these common patterns, which are extensively utilized in practical scenarios.
+
+=== Red-black Tree Balancing
+
+The provided code from @algoxy demonstrates an operation on the red-black tree, specifically the rebalancing process following an insertion. This code transforms the tree's structure to preserve the invariants that red-black trees must maintain. Implemented in Haskell, this function employs a pattern-matching style:
+#text(9pt)[
+```hs
+balance B (Node R (Node R a x b) y c) z d = Node R (Node B a x b) y (Node B c z d)
+balance B (Node R a x (Node R b y c)) z d = Node R (Node B a x b) y (Node B c z d)
+balance B a x (Node R b y (Node R c z d)) = Node R (Node B a x b) y (Node B c z d)
+balance B a x (Node R (Node R b y c) z d) = Node R (Node B a x b) y (Node B c z d)
+balance color l k r = Node color l k r
+```
+]
+In this function, the left-hand side applies pattern matching to deconstruct the tree nodes and checks if their configuration falls into one of the specified categories for rebalancing. The four cases listed address different possible states of imbalance caused by insertion. On the right-hand side, if a potential violation of the red-black tree properties is identified, a new node structure is constructed. This reconstruction uses the fields decomposed from the original nodes on the left-hand side, effectively rebalancing the tree and ensuring that it adheres to the necessary red-black properties. Indeed, as one may notice, this function heavily employs consecutive uses of elimination rules and introduction rules.
+
+=== Normalization of (Partial) Evaluation
+
+Another example arises from dependent type checkers, which are a core component of proof assistants.
 
 
 == e.g. User Feedback
