@@ -5,6 +5,7 @@
 #import "thesis_typ/acknowledgement.typ": *
 #import "thesis_typ/abstract_en.typ": *
 #import "common/metadata.typ": *
+#import "@preview/fletcher:0.4.2" as fletcher: node, edge
 
 #titlepage(
   title: titleEnglish,
@@ -96,7 +97,13 @@ In this function, the left-hand side applies pattern matching to deconstruct the
 
 === Normalization of (Partial) Evaluation
 
-Another motivating example arises from dependent type checkers, which are a core component of proof assistants. From implementation perspectives, in an dependently typed system, there is no explicit distinction 
+Another compelling example is found in the domain of dependent type checkers, which are fundamental to proof assistants. In a dependently typed system, the core language does not make a clear distinction between types and data. As a consequence, for type checking to be executed, proof assistants must (weakly) normalize the language terms @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory. A notable strategy to accomplish this is through Normalization by Elaboration (NbE), also known as Normalization by Partial Evaluation (NbPE) @normalization-by-evaluation @NbPE.
+
+#fletcher.diagram(cell-size: 15mm, $
+  #let interp = "interp"
+  T edge(bracket.l.double dot.c bracket.r.double, ->) edge("d", text("norm"), ->) & lr(bracket.l.double T bracket.r.double) \
+  T' edge(text("reify"), "<-") & lr(bracket.l.double T' bracket.r.double) edge("u", text("eval"), <-) 
+$)
 
 
 == e.g. User Feedback
