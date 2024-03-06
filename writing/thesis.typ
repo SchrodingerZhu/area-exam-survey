@@ -96,7 +96,7 @@ In this function, the left-hand side applies pattern matching to deconstruct the
 
 === Normalization of (Partial) Evaluation
 
-Another example arises from dependent type checkers, which are a core component of proof assistants.
+Another motivating example arises from dependent type checkers, which are a core component of proof assistants. From implementation perspectives, in an dependently typed system, there is no explicit distinction 
 
 
 == e.g. User Feedback
