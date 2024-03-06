@@ -99,11 +99,21 @@ In this function, the left-hand side applies pattern matching to deconstruct the
 
 Another compelling example is found in the domain of dependent type checkers, which are fundamental to proof assistants. In a dependently typed system, the core language does not make a clear distinction between types and data. As a consequence, for type checking to be executed, proof assistants must (weakly) normalize the language terms @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory. A notable strategy to accomplish this is through Normalization by Elaboration (NbE), also known as Normalization by Partial Evaluation (NbPE) @normalization-by-evaluation @NbPE.
 
-#fletcher.diagram(cell-size: 15mm, $
-  #let interp = "interp"
-  T edge(bracket.l.double dot.c bracket.r.double, ->) edge("d", text("norm"), ->) & lr(bracket.l.double T bracket.r.double) \
-  T' edge(text("reify"), "<-") & lr(bracket.l.double T' bracket.r.double) edge("u", text("eval"), <-) 
-$)
+The basic idea behind NbPE is to design a specific semantic interpretation $lr(bracket.l.double dot.c bracket.r.double)$ that can be evaluated efficiently in the host language and paired with a quote (or reify) operation that can convert an object in the semantic interpretation domain back to the terms.
+
+#figure(
+  caption: "Diagram of NbPE",
+  fletcher.diagram( {
+  let (g, f, G, F) = ((-1, 1), (-1, -1), (1, 1), (1, -1));
+  node(f, $T$)
+  node(g, $T'$)
+  node(F, $lr(bracket.l.double T bracket.r.double)$)
+  node(G, $lr(bracket.l.double T' bracket.r.double)$)
+  edge(f, g, "->", "norm")
+  edge(f, F, "->", $lr(bracket.l.double dot.c bracket.r.double)$)
+  edge(F, G, "->", "eval")
+  edge(G, g, "->", "quote/reify")
+})) <NbPE-diagram>
 
 
 == e.g. User Feedback
