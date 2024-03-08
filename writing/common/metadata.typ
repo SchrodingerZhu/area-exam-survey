@@ -1,4 +1,4 @@
-// Enter your thesis data here:
+// Enter your metadata here:
 #let titleEnglish = $bold(R^3)$ + ": Reuse Analysis, Review and Rethinking"
 #let advisor = "Prof. Dr. Chen Ding"
 #let author = "Yifan Zhu"

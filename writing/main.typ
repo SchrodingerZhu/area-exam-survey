@@ -1,9 +1,9 @@
-#import "thesis_template.typ": *
+#import "template.typ": *
 #import "common/titlepage.typ": *
-#import "thesis_typ/openning.typ": *
-#import "thesis_typ/disclaimer.typ": *
-#import "thesis_typ/acknowledgement.typ": *
-#import "thesis_typ/abstract_en.typ": *
+#import "typst/openning.typ": *
+#import "typst/disclaimer.typ": *
+#import "typst/acknowledgement.typ": *
+#import "typst/abstract_en.typ": *
 #import "common/metadata.typ": *
 #import "@preview/fletcher:0.4.2" as fletcher: node, edge
 

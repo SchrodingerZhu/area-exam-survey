@@ -88,8 +88,8 @@
   // Appendix.
   pagebreak()
   heading(numbering: none)[Appendix A: Supplementary Material]
-  include("thesis_typ/appendix.typ")
+  include("typst/appendix.typ")
 
   pagebreak()
-  bibliography("thesis.bib")
+  bibliography("main.bib")
 }
