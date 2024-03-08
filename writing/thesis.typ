@@ -99,7 +99,8 @@ In this function, the left-hand side applies pattern matching to deconstruct the
 
 Another compelling example is found in the domain of dependent type checkers, which are fundamental to proof assistants. In a dependently typed system, the core language does not make a clear distinction between types and data. As a consequence, for type checking to be executed, proof assistants must (weakly) normalize the language terms @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory. A notable strategy to accomplish this is through Normalization by Elaboration (NbE), also known as Normalization by Partial Evaluation (NbPE) @normalization-by-evaluation @NbPE.
 
-The basic idea behind NbPE is to design a specific semantic interpretation $lr(bracket.l.double dot.c bracket.r.double)$ that can be evaluated efficiently in the host language and paired with a quote (or reify) operation that can convert an object in the semantic interpretation domain back to the terms.
+The basic idea behind NbPE is to devise a specific semantic interpretation, denoted as 
+$lr(bracket.l.double dot.c bracket.r.double)$, that can be efficiently evaluated in the host language. This is coupled with a quote (or reify) operation that converts an object from the semantic interpretation domain back into the language's terms. The interpretation and reification, in a pair, garantee that @NbPE-diagram commutes.
 
 #figure(
   caption: "Diagram of NbPE",
@@ -115,6 +116,25 @@ The basic idea behind NbPE is to design a specific semantic interpretation $lr(b
   edge(G, g, "->", "quote/reify")
 })) <NbPE-diagram>
 
+
+The provided code from @elaberation-zoo showcases a way to apply NbPE to the Untyped Lambda Calculus (UTLC):
+
+```hs   
+eval :: Env -> Tm -> Val
+eval env = \case
+  Var x     -> fromJust $ lookup x env
+  App t u   -> eval env t $$ eval env u
+  Lam x t   -> VLam x (\u -> eval ((x, u):env) t)
+  Let x t u -> eval ((x, eval env t):env) u
+
+quote :: [Name] -> Val -> Tm
+quote ns = \case
+  VVar x                 -> Var x
+  VApp t u               -> App (quote ns t) (quote ns u)
+  VLam (fresh ns -> x) t -> Lam x (quote (x:ns) (t (VVar x)))
+```
+
+One can observe that such operations heavily involve the elimination and introduction processes, executed in a consecutive manner.
 
 == e.g. User Feedback
 #rect(
