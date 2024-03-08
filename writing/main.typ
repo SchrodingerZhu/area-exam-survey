@@ -77,7 +77,7 @@ $
 
 == Introductions and Eliminations
 
-In order to effectively reason about these inductively defined data structures, functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. Introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
+In order to effectively reason about these inductively defined data structures (in the mathematical manner mentioned in the previous chapter), functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. Introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
 
 The operations that manipulate these data structures rely heavily on the application of these rules. In the subsequent section, we will explore two additional case studies that illustrate these common patterns, which are extensively utilized in practical scenarios.
 
@@ -135,6 +135,9 @@ quote ns = \case
 ```
 
 One can observe that such operations heavily involve the elimination and introduction processes, executed in a consecutive manner.
+
+= The Memory Reuse Problem
+== The Essence of Reuse Analysis
 
 == e.g. User Feedback
 #rect(
