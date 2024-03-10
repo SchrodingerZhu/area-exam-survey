@@ -137,7 +137,58 @@ quote ns = \case
 One can observe that such operations heavily involve the elimination and introduction processes, executed in a consecutive manner.
 
 = The Memory Reuse Problem
-== The Essence of Reuse Analysis
+== The Essence of Memory Reuse
+
+In previous section, we have seen examples of frequent invocations to introduction and eliminations. In the language runtime, this involves allocations and deallocations of memory objects. As such, memory reuse becomes a crucial asepct of performance improvement. As we shall see in the following sections, this idea is captured in various perspectives of runtime implementations.
+
+== Memory Reuse in Allocators
+
+In the userspace of modern Unix operating systems, memory is are typically acquired from the kernel in page granularity via syscall wrappers such as `mmap` @mmap. However, it is too costly to use `mmap/munmap` on each allocation and deallocation. Since `mmap` can only reverse page-length virtual address space, direct `mmap` may result in heavy fragmentation.
+
+To mitigate such problems, userspace memory are usually managed by memory allocators. Basically, allocators behave as a cache for pages between OS and userspace allocations. On allocation, instead of calling `mmap` directly, allocators prefer to use available space in its cached pages. On deallocation, instead of returning the page to OS, it delays the free of the page by putting it into the cache pool first. This behavior is a lower-level form of memory reuse: it reuses available space in pages from deallocations with the hope that following allocations may utilize the memory space again.
+
+Allocators such as the one provided by libc can be simultaneously used by multiple threads. As a result, the global page pool is usually protected by mutex or other synchronization methods. This implies additional cost on the invocations of `malloc/free`. To avoid extra cost, some modern allocators such as `mimalloc` @leijen2019mimalloc and `snmalloc` @snmalloc introduce a mechanism called freelist sharding.  The page pool is separated for different size classes and available memory blocks are installed into local freelists first and only passed back to global pool when some threshold is reached. This mechanism introduces another layer of memory reuse which put the local context into considerations. The consecutive allocations and deallocations only involves frequent pushing and popping memory objects from local lists and thus enjoy a higher throughput.
+
+For small allocations on the fast path when an allocation hit local freelists, there are only about $45$ general instructions with only two branches in `snmalloc` , which is way less than the cold initialization routine.
+
+#let flowgraph = { 
+import fletcher.shapes: diamond
+  fletcher.diagram(
+    node-stroke: 1pt,
+    edge-stroke: 1pt,
+    node((0,0), [Malloc], corner-radius: 2pt, extrude: (0, 3)),
+    edge("-|>"),
+    node((0,1), align(center)[
+      Initialized?
+    ], shape: diamond),
+    edge("d", "-|>", [Yes], label-pos: 0.1),
+    node((0,2), align(center)[
+      Local freelist available?
+    ], shape: diamond),
+    edge("d", "-|>", [Yes], label-pos: 0.1),
+    node((0,3), [Return local block], corner-radius: 2pt, extrude: (0, 3)),
+  )
+  h(1cm)
+  fletcher.diagram(
+    node-stroke: 1pt,
+    edge-stroke: 1pt,
+    node((0,0), [Free], corner-radius: 2pt, extrude: (0, 3)),
+    edge("-|>"),
+    node((0,1), align(center)[
+      Is Local Block?
+    ], shape: diamond),
+    edge("d", "-|>", [Yes], label-pos: 0.1),
+    node((0,2), align(center)[
+      Local freelist not full?
+    ], shape: diamond),
+    edge("d", "-|>", [Yes], label-pos: 0.1),
+    node((0,3), [Append to local list], corner-radius: 2pt, extrude: (0, 3)),
+  )
+}
+
+#figure(flowgraph, caption: "Fast paths for snmalloc")
+
+== Memory Reuse in Garbage Collectors
 
 == e.g. User Feedback
 #rect(
