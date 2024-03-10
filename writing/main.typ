@@ -188,7 +188,18 @@ import fletcher.shapes: diamond
 
 #figure(flowgraph, caption: "Fast paths for snmalloc")
 
-== Memory Reuse in Garbage Collectors
+== Reuse Analysis
+
+Functional languages like Erlang, Haskell and OCaml are using rather sophiscated garbage collection algorithms @haskell @erlang-1 @erlang-2 @ocaml-pm @ocaml. Albiet differences in their implementations, these garbage collectors are all based on generational copying GC. To some extend, the generational design captures reuse patterns. As mentioned in @haskell, the promotion from young generation to old ones are based on tenuring model. The "weak-generational hypothesis" assumes that young generation objects may subject to more frequent reclaimations. Such assumption captures the temporal aspect of introduction and elimination in functional programming patterns.
+
+However, due to the nature of garbage collection based apporach, these memory reuse are generally delayed in batches. Even with local freelist sharding, the efficiency of functional data structures may still fall behinds imperative data structures due to two major differences:
+
+1. Imperative data structures are usually modified in place rather eliminating the old one and introducing a new one.
+2. Deallocations of objects are more explicit and precise.
+
+To get the functional approximation of these features, beside efficient reclaimations, we will also need to get the uniqueness (or exclusivity) of a managed object. It turns out that RC-based approaches shines in this scenario. Recent work in @perceus @frame-limited @fp2 gradually build up a full set of RC-based reuse analysis and optimizations.
+
+
 
 == e.g. User Feedback
 #rect(

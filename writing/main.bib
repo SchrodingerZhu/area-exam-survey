@@ -197,24 +197,6 @@ location = {Portland, Oregon, USA},
 series = {POPL '94}
 }
 
-@inproceedings{10.1145/800020.808261,
-author = {Ungar, David},
-title = {Generation Scavenging: A non-disruptive high performance storage reclamation algorithm},
-year = {1984},
-isbn = {0897911318},
-publisher = {Association for Computing Machinery},
-address = {New York, NY, USA},
-url = {https://doi.org/10.1145/800020.808261},
-doi = {10.1145/800020.808261},
-abstract = {Many interactive computing environments provide automatic storage reclamation and virtual memory to ease the burden of managing storage. Unfortunately, many storage reclamation algorithms impede interaction with distracting pauses. Generation Scavenging is a reclamation algorithm that has no noticeable pauses, eliminates page faults for transient objects, compacts objects without resorting to indirection, and reclaims circular structures, in one third the time of traditional approaches.We have incorporated Generation Scavenging in Berkeley Smalltalk(BS), our Smalltalk-80 implementation, and instrumented it to obtain performance data. We are also designing a microprocessor with hardware support for Generation Scavenging.},
-booktitle = {Proceedings of the First ACM SIGSOFT/SIGPLAN Software Engineering Symposium on Practical Software Development Environments},
-pages = {157–167},
-numpages = {11},
-keywords = {Generation, Grabage collection, Personnel computer, Real time, Scavenge, Smalltalk, Virtual memory, Workstation},
-series = {SDE 1}
-}
-
-
 @article{erlang-1,
 author = {Ungar, David},
 title = {Generation Scavenging: A non-disruptive high performance storage reclamation algorithm},
@@ -581,7 +563,20 @@ title = {mmap - map pages of memory},
 year = 2018
 }
 
+@inproceedings{linear-haskell,
+author = {Bernardy, Jean-Philippe and Boespflug, Mathieu and Newton, Ryan R. and Peyton Jones, Simon and Spiwack, Arnaud},
+title = {Linear Haskell: practical linearity in a higher-order polymorphic language},
+booktitle = {Principles of Programming Languages 2018 (POPL 2018)},
+year = {2018},
+month = {January},
+abstract = {Linear type systems have a long and storied history, but not a clear path forward to integrate with existing languages such as OCaml or Haskell. In this paper, we study a linear type system designed with two crucial properties in mind: backward-compatibility and code reuse across linear and non-linear users of a library. Only then can the benefits of linear types permeate conventional functional programming. Rather than bifurcate types into linear and non-linear counterparts, we instead attach linearity to function arrows. Linear functions can receive inputs from linearly-bound values, but can also operate over unrestricted, regular values.
 
+To demonstrate the efficacy of our linear type system - both how easy it can be integrated into an existing language implementation and how streamlined it makes it to write programs with linear types - we implemented our type system in GHC, the leading Haskell compiler, and demonstrate two kinds of applications of linear types: mutable data with pure interfaces; and enforcing protocols in I/O-performing functions.
+
+Here is my talk at Curry On, July 2018},
+publisher = {ACM},
+url = {https://www.microsoft.com/en-us/research/publication/linear-haskell-practical-linearity-higher-order-polymorphic-language/},
+}
 
 
 
