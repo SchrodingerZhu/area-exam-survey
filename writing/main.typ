@@ -199,6 +199,37 @@ However, due to the nature of garbage collection based apporach, these memory re
 
 To get the functional approximation of these features, beside efficient reclaimations, we will also need to get the uniqueness (or exclusivity) of a managed object. It turns out that RC-based approaches shines in this scenario. Recent work in @perceus @frame-limited @fp2 gradually build up a full set of RC-based reuse analysis and optimizations.
 
+Compared with complicated GC runtime, RC itself is a simple and straightfoward. In fact, the inductively defined red-black tree can be translated into Rust using `Rc` in a canonical way.
+
+#text(size: 12pt)[
+```rs
+pub fn balance(
+  color: Color, 
+  left: Rc<RbTree>, 
+  value: i32, 
+  right: Rc<RbTree>
+) -> Rc<RbTree> {
+    if color == B
+        && let Node(R, ll, y, c) = &*left
+        && let Node(R, a, x, b) = &**ll
+    {
+        return Rc::new(Node(
+            R,
+            Rc::new(Node(B, a.clone(), *x, b.clone())),
+            *y,
+            Rc::new(Node(B, c.clone(), value, right)),
+        ));
+    }
+    todo!("remaining balance cases are ignored...");
+    // implicitly, the following operation are added by the compiler
+    drop(right);
+    drop(left);
+}
+```
+]
+
+However, one may notice that several operations are added. Effectively, if the memory are to be managed with `Rc`, new memory cells need to be allocated (`Rc::new`) for fresh objects, reference counts of existing objects need to be increased before the underlying objects can be shared with other structures (`Rc::clone`), and referece counts shall decrease if the underlying object is no longer in use which may trigger deallocations if necessary (`Rc::drop`).
+
 
 
 == e.g. User Feedback
