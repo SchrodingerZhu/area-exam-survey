@@ -190,16 +190,16 @@ import fletcher.shapes: diamond
 
 == Reuse Analysis
 
-Functional languages like Erlang, Haskell and OCaml are using rather sophiscated garbage collection algorithms @haskell @erlang-1 @erlang-2 @ocaml-pm @ocaml. Albiet differences in their implementations, these garbage collectors are all based on generational copying GC. To some extend, the generational design captures reuse patterns. As mentioned in @haskell, the promotion from young generation to old ones are based on tenuring model. The "weak-generational hypothesis" assumes that young generation objects may subject to more frequent reclaimations. Such assumption captures the temporal aspect of introduction and elimination in functional programming patterns.
+Functional languages like Erlang, Haskell, and OCaml utilize sophisticated garbage collection algorithms, despite differences in their implementations, as noted in @haskell, @erlang-1, @erlang-2, @ocaml-pm, and @ocaml. These garbage collectors are all based on the generational copying GC principle. The generational approach, to some extent, mirrors reuse patterns; for instance, as discussed in @haskell, the promotion from the younger to older generations follows a tenuring model. The "weak generational hypothesis" posits that objects in the young generation are more likely to be reclaimed frequently, reflecting the transient nature of data in functional programming through the cycle of introduction and elimination.
 
-However, due to the nature of garbage collection based apporach, these memory reuse are generally delayed in batches. Even with local freelist sharding, the efficiency of functional data structures may still fall behinds imperative data structures due to two major differences:
+However, due to the batched nature of garbage collection, memory reuse is generally delayed, leading to potential inefficiencies when compared to imperative data structures. This is primarily because:
 
-1. Imperative data structures are usually modified in place rather eliminating the old one and introducing a new one.
-2. Deallocations of objects are more explicit and precise.
+1. Imperative data structures are usually modified in place, as opposed to being completely recreated, thus avoiding the cycle of elimination and introduction inherent in functional structures.
+2. Deallocations in imperative programming are more explicit and precise, leading to potentially more efficient memory use.
 
-To get the functional approximation of these features, beside efficient reclaimations, we will also need to get the uniqueness (or exclusivity) of a managed object. It turns out that RC-based approaches shines in this scenario. Recent work in @perceus @frame-limited @fp2 gradually build up a full set of RC-based reuse analysis and optimizations.
+To approach the functional equivalent of these characteristics, beyond efficient reclamation, one also needs to ensure the uniqueness (or exclusivity) of managed objects. Here, RC-based (Reference Counting) strategies excel, as recent works in @perceus, @frame-limited, and @fp2 have started to establish a comprehensive set of RC-based reuse analysis and optimizations.
 
-Compared with complicated GC runtime, RC itself is a simple and straightfoward. In fact, the inductively defined red-black tree can be translated into Rust using `Rc` in a canonical way.
+Compared to complex GC runtimes, RC is simpler and more straightforward. For example, an inductively defined red-black tree can be translated into Rust using Rc in a standard manner as illustrated:
 
 #text(size: 12pt)[
 ```rs
@@ -228,7 +228,7 @@ pub fn balance(
 ```
 ]
 
-However, one may notice that several operations are added. Effectively, if the memory are to be managed with `Rc`, new memory cells need to be allocated (`Rc::new`) for fresh objects, reference counts of existing objects need to be increased before the underlying objects can be shared with other structures (`Rc::clone`), and referece counts shall decrease if the underlying object is no longer in use which may trigger deallocations if necessary (`Rc::drop`).
+However, with Rc, several additional operations are necessary. New memory cells must be allocated (`Rc::new`) for new objects, reference counts of existing objects must be incremented before they can be shared (`Rc::clone`), and reference counts should decrease when objects are no longer in use, potentially triggering deallocations (`Rc::drop`).
 
 
 
