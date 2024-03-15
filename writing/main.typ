@@ -230,6 +230,45 @@ pub fn balance(
 
 However, with Rc, several additional operations are necessary. New memory cells must be allocated (`Rc::new`) for new objects, reference counts of existing objects must be incremented before they can be shared (`Rc::clone`), and reference counts should decrease when objects are no longer in use, potentially triggering deallocations (`Rc::drop`).
 
+In Rust and C++, `Rc` or `shared_pointer` is nothing but a normal structure defined in the standard library. Their constructions and deconstructions are treated in the same way of other objects. That is, the `drop` operation, if no explicit specified, will be inserted by the compiler when exiting the lexical scope of the `Rc` object. 
+
+Koka and Lean internalize `Rc` as a part of IR; thus allowing manipulations of the `Rc` object. In the above example, such compilers will identify the frontier of uses of the `Rc` object and insert the `drop` operations for them as soon as they are no longer being used. 
+
+#text(size: 12pt)[
+```rs
+pub fn balance(
+  color: Color, 
+  left: Rc<RbTree>, 
+  value: i32, 
+  right: Rc<RbTree>
+) -> Rc<RbTree> {
+    if color == B
+        && let Node(R, ll, y, c) = &*left
+        && let Node(R, a, x, b) = &**ll
+    {
+        let a = a.clone();
+        let b = b.clone();
+        let c = c.clone();
+        let x = *x;
+        let y = *y;
+        drop(left);
+        return Rc::new(Node(
+            R,
+            Rc::new(Node(B, a, x, b)),
+            y,
+            Rc::new(Node(B, c, value, right)),
+        ));
+    }
+    todo!("remaining balance cases are ignored...");
+}
+```
+]
+This code motion has several benefits. One a memory cell is no longer referenced, it will be released before subsequent calls to constructors. Consider a data structure not widely shared, such early release together with the local freelist technique from allocators will enable possible reuse of memory cells.
+
+Unfortunately, such code motions also incur substantial costs.
+1. In Rust (and C++), `Rc` are usually constructed with the hope that it may be shared at various sites. Hence, its deallocation is annotated as a cold path, potentially confusing the branch prediction;
+2. Even though the memory reuse is possible, the calls to allocations and deallocations may not be easily canceled. C++ does permit cancellation of `new` and `delete` pairs, but the compiler support is rather restrictive;
+3. Meanwhile, such code always projects out subfields via clone operations no matter the memory reuse is feasible or not (or, whether the `Rc` is holding the exclusive reference to the object). In the case of exclusive access, there is no need to do `clone` followed by `drop` for subfields.
 
 
 == e.g. User Feedback
