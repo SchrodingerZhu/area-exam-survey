@@ -77,7 +77,7 @@ $
 
 == Introductions and Eliminations
 
-In order to effectively reason about these inductively defined data structures (in the mathematical manner mentioned in the previous chapter), functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. Introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
+In order to effectively reason about these inductively defined data structures (in the mathematical manner mentioned in the previous chapter), functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. As an interesting comparison, @Lafont1997InteractionC also mentioned that the fundamental laws of computation are commutation (where new combinations are created) and annihilation (where cells are eliminated). In the context of functional programming, introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
 
 The operations that manipulate these data structures rely heavily on the application of these rules. In the subsequent section, we will explore two additional case studies that illustrate these common patterns, which are extensively utilized in practical scenarios.
 
@@ -190,6 +190,8 @@ import fletcher.shapes: diamond
 
 == Reuse Analysis
 
+=== Precise Reference Counting for Reuse Analysis
+
 Functional languages like Erlang, Haskell, and OCaml utilize sophisticated garbage collection algorithms, despite differences in their implementations, as noted in @haskell, @erlang-1, @erlang-2, @ocaml-pm, and @ocaml. These garbage collectors are all based on the generational copying GC principle. The generational approach, to some extent, mirrors reuse patterns; for instance, as discussed in @haskell, the promotion from the younger to older generations follows a tenuring model. The "weak generational hypothesis" posits that objects in the young generation are more likely to be reclaimed frequently, reflecting the transient nature of data in functional programming through the cycle of introduction and elimination.
 
 However, due to the batched nature of garbage collection, memory reuse is generally delayed, leading to potential inefficiencies when compared to imperative data structures. This is primarily because:
@@ -199,31 +201,16 @@ However, due to the batched nature of garbage collection, memory reuse is genera
 
 To approach the functional equivalent of these characteristics, beyond efficient reclamation, one also needs to ensure the uniqueness (or exclusivity) of managed objects. Here, RC-based (Reference Counting) strategies excel, as recent works in @perceus, @frame-limited, and @fp2 have started to establish a comprehensive set of RC-based reuse analysis and optimizations.
 
-Compared to complex GC runtimes, RC is simpler and more straightforward. For example, an inductively defined red-black tree can be translated into Rust using Rc in a standard manner as illustrated:
+Compared to complex GC runtimes, RC is simpler and more straightforward. For example, the inductively defined integer list reversing function can be translated into Rust using `Rc` in a standard manner as illustrated:
 
 #text(size: 12pt)[
 ```rs
-pub fn balance(
-  color: Color, 
-  left: Rc<RbTree>, 
-  value: i32, 
-  right: Rc<RbTree>
-) -> Rc<RbTree> {
-    if color == B
-        && let Node(R, ll, y, c) = &*left
-        && let Node(R, a, x, b) = &**ll
-    {
-        return Rc::new(Node(
-            R,
-            Rc::new(Node(B, a.clone(), *x, b.clone())),
-            *y,
-            Rc::new(Node(B, c.clone(), value, right)),
-        ));
-    }
-    todo!("remaining balance cases are ignored...");
-    // implicitly, the following operation are added by the compiler
-    drop(right);
-    drop(left);
+pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
+  match *xs {
+    List::Nil => acc,
+    List::Cons(ref x, ref xs) => 
+      everse(xs.clone(), Rc::new(List::Cons(x.clone(), acc)))
+  }
 }
 ```
 ]
@@ -236,30 +223,16 @@ Koka and Lean internalize `Rc` as a part of IR; thus allowing manipulations of t
 
 #text(size: 12pt)[
 ```rs
-pub fn balance(
-  color: Color, 
-  left: Rc<RbTree>, 
-  value: i32, 
-  right: Rc<RbTree>
-) -> Rc<RbTree> {
-    if color == B
-        && let Node(R, ll, y, c) = &*left
-        && let Node(R, a, x, b) = &**ll
-    {
-        let a = a.clone();
-        let b = b.clone();
-        let c = c.clone();
-        let x = *x;
-        let y = *y;
-        drop(left);
-        return Rc::new(Node(
-            R,
-            Rc::new(Node(B, a, x, b)),
-            y,
-            Rc::new(Node(B, c, value, right)),
-        ));
+pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
+  match *xs {
+    List::Nil => acc,
+    List::Cons(ref y, ref ys) => {
+      let y = y.clone();
+      let ys = ys.clone();
+      drop(xs);
+      reverse(ys, Rc::new(List::Cons(y, acc)))
     }
-    todo!("remaining balance cases are ignored...");
+  }
 }
 ```
 ]
@@ -270,6 +243,71 @@ Unfortunately, such code motions also incur substantial costs.
 2. Even though the memory reuse is possible, the calls to allocations and deallocations may not be easily canceled. C++ does permit cancellation of `new` and `delete` pairs, but the compiler support is rather restrictive;
 3. Meanwhile, such code always projects out subfields via clone operations no matter the memory reuse is feasible or not (or, whether the `Rc` is holding the exclusive reference to the object). In the case of exclusive access, there is no need to do `clone` followed by `drop` for subfields.
 
+To mitigate these issues, one can inline the destructors associated with the `List`. To make sure the memory cell is reused immediately, we also explicitly express the passing of memory. Although the following Rust code is conceptual and not directly admissible by standard Rust compilers, it serves to illustrate the underlying idea:
+
+#text(size: 12pt)[
+```rs
+pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
+  match xs {
+    List::Nil => acc,
+    List::Cons(ref y, ref ys) => {
+      let y = y.clone();
+      let ys = ys.clone();
+      let mem = if Rc::is_unique(xs) {
+        drop(y);
+        drop(ys);
+        Some(Rc::take_memory(xs))
+      } else { None };
+      reverse(ys, Rc::reuse_or_alloc(mem, List::Cons(y, acc)))
+    }
+  }
+}
+```
+]
+
+As an optimization, the `clone()` operations could be moved inside the `Rc::is_unique` branch to pair with the `drop()` operations, eliminating unnecessary cloning when the Rc is unique. This modification leads to a cleaner and more efficient path for direct memory reuse:
+
+#text(size: 12pt)[
+```rs
+pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
+  match xs {
+    List::Nil => acc,
+    List::Cons(ref y, ref ys) => {
+      let mem = if Rc::is_unique(xs) {
+        Some(Rc::take_memory(xs))
+      } else { 
+        let y = y.clone();
+        let ys = ys.clone();
+        None 
+      };
+      reverse(ys, Rc::reuse_or_alloc(mem, List::Cons(y, acc)))
+    }
+  }
+}
+```
+]
+
+=== Frame-limited Reuse Analysis
+
+To assess the potential for reusability, the initial strategy adopted in Koka, as outlined in @perceus, involves attempting to drop the memory right after pattern destruction. This action signifies the memory resource as available for reuse. This concept is closely aligned with the notion that pattern destructions serve as typical elimination points for inductive data structures. However, as highlighted in @frame-limited, this approach can encounter significant challenges that may hinder the effective reuse of memory.
+
+Consider the following conceptual code (notice that `clone()`, `drop()` are not yet inserted):
+
+#text(size: 12pt)[
+```rs 
+pub fn foo(bar: Rc<List>, baz: bool) -> Rc<List> {
+  match bar {
+    List::Cons(hd, tl) => {
+      match baz {
+        true => bar,
+        false => List::Cons(1, tl),
+      }
+    }
+    _ => omitted!()
+  }
+}
+```
+]
 
 == e.g. User Feedback
 #rect(
