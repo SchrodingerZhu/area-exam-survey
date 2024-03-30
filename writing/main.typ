@@ -111,7 +111,7 @@ $lr(bracket.l.double dot.c bracket.r.double)$, that can be efficiently evaluated
   node(F, $lr(bracket.l.double T bracket.r.double)$)
   node(G, $lr(bracket.l.double T' bracket.r.double)$)
   edge(f, g, "->", "norm")
-  edge(f, F, "->", $lr(bracket.l.double dot.c bracket.r.double)$)
+  edge(f, F, "->", $bracket.l.double" "dot.c" "bracket.r.double$)
   edge(F, G, "->", "eval")
   edge(G, g, "->", "quote/reify")
 })) <NbPE-diagram>
@@ -308,6 +308,57 @@ pub fn foo(bar: Rc<List>, baz: bool) -> Rc<List> {
 }
 ```
 ]
+
+Inserting the `drop()` operation immediately after pattern destruction is not always feasible, particularly when the variable in question is utilized within a nested branch. A viable workaround is to defer the `drop()` to subsequent layers of the program. This kind of code transformation can be systematically executed, a process that will be elaborated on in the context of "drop-guided" release analysis, as discussed in @frame-limited. Before delving into that discussion, let's examine another motivating example to further illustrate the concept.
+
+#text(size: 12pt)[
+```rs 
+pub fn foo(bar: Rc<List>, baz: bool) -> Rc<List> {
+  match bar {
+    List::Cons(_, _) => {
+      let qux = quux(bar)
+      Rc::new(Cons(qux, Nil))
+    }
+    _ => omitted!()
+  }
+}
+```
+]
+
+If the reuse analysis is too "optimistic", one may end up getting the following code:
+#text(size: 12pt)[
+```rs 
+let qux = quux(bar.clone())
+let token = drop_with_memory(bar);
+Rc::reuse_or_alloc(token, Cons(qux, Nil))
+``` 
+] 
+While this code captures the reuse opportunity, it introduces another problem. That is, even though the memory associated with `bar` may have already become available for reuse before calling `quux`, it is not released during the entire execution of `quux`. In the worst-case scenario, this could result in a continuous increase in heap usage, especially if quux is a long-running operation or if similar patterns are prevalent throughout the codebase, leading to inefficient memory utilization.
+
+@frame-limited believes that problems mentioned above fundamentally stem from a disregard for liveness in reuse analysis. The reuse analysis pass already acquire essential information of the liveness of objects. Hence, the reuse decisions  decisions should be more closely aligned with this liveness data. As shown in @analysis-flow, the proposed algorithm leverages liveness information to pinpoint the frontier where a managed object is used for the last time. Drops are inserted to such sites. In this way, if the ownership of an object is passed to another function, neither `drop()` nor `clone()` will be added, avoiding the problem in `quux(bar.clone())`. To achieve memory reuse, a `drop()` in this case, will always generate a reuse token carried by the context. Going along the control flow, if there is an allocation that is feasible to reuse memory resource carried within the context, the reuse token will be assigned to the allocation. Conversely, if there is no possible memory reuse, an additional `free()` operation will be inserted to clean up any surplus tokens.
+
+#let analysis-flow = { 
+import fletcher.shapes: diamond
+  fletcher.diagram(
+    node-stroke: 1pt,
+    edge-stroke: 1pt,
+    node((0,0), [Input IR], corner-radius: 2pt, extrude: (0, 3)),
+    edge("->"),
+    node((1,0), align(center)[
+      Last Use Frontier
+    ]),
+    edge("->", label-pos: 0.1),
+    node((2,0), align(center)[
+      Insert Drop
+    ]),
+    edge("->", label-pos: 0.1),
+    node((3, 0), [Pair Possible Reuse], ),
+  )
+}
+#figure(
+analysis-flow,
+caption: "Frame-limited Reuse Analysis Flow"
+)<analysis-flow>
 
 == e.g. User Feedback
 #rect(
