@@ -624,6 +624,69 @@ series = {HILT '14}
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
+@InProceedings{Kappa,
+  author =	{Castegren, Elias and Wrigstad, Tobias},
+  title =	{{Reference Capabilities for Concurrency Control}},
+  booktitle =	{30th European Conference on Object-Oriented Programming (ECOOP 2016)},
+  pages =	{5:1--5:26},
+  series =	{Leibniz International Proceedings in Informatics (LIPIcs)},
+  ISBN =	{978-3-95977-014-9},
+  ISSN =	{1868-8969},
+  year =	{2016},
+  volume =	{56},
+  editor =	{Krishnamurthi, Shriram and Lerner, Benjamin S.},
+  publisher =	{Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  address =	{Dagstuhl, Germany},
+  URL =		{https://drops-dev.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2016.5},
+  URN =		{urn:nbn:de:0030-drops-60998},
+  doi =		{10.4230/LIPIcs.ECOOP.2016.5},
+  annote =	{Keywords: Type systems, Capabilities, Traits, Concurrency, Object-Oriented}
+}
+
+@article{Pony,
+author = {Clebsch, Sylvan and Franco, Juliana and Drossopoulou, Sophia and Yang, Albert Mingkun and Wrigstad, Tobias and Vitek, Jan},
+title = {Orca: GC and type system co-design for actor languages},
+year = {2017},
+issue_date = {October 2017},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {1},
+number = {OOPSLA},
+url = {https://doi.org/10.1145/3133896},
+doi = {10.1145/3133896},
+abstract = {ORCA is a concurrent and parallel garbage collector for actor programs, which does not require any STW steps, or synchronization mechanisms, and that has been designed to support zero-copy message passing and sharing of mutable data. ORCA is part of a runtime for actor-based languages, which was co-designed with the Pony programming language, and in particular, with its data race free type system. By co-designing an actor language with its runtime, it was possible to exploit certain language properties in order to optimize performance of garbage collection. Namely, ORCA relies on the guarantees of absence of race conditions in order to avoid read/write barriers, and it leverages the actor message passing, for synchronization among actors.  In this paper we briefly describe Pony and its type system. We use pseudo-code in order to introduce how ORCA allocates and deallocates objects, how it shares mutable data without requiring barriers upon data mutation, and how can immutability be used to further optimize garbage collection. Moreover, we discuss the advantages of co-designing an actor language with its runtime, and we demonstrate that ORCA can be implemented in a performant and scalable way through a set of micro-benchmarks, including a comparison with other well-known collectors.},
+journal = {Proc. ACM Program. Lang.},
+month = {oct},
+articleno = {72},
+numpages = {28},
+keywords = {messages, actors}
+}
+
+@article{Verona,
+author = {Arvidsson, Ellen and Castegren, Elias and Clebsch, Sylvan and Drossopoulou, Sophia and Noble, James and Parkinson, Matthew J. and Wrigstad, Tobias},
+title = {Reference Capabilities for Flexible Memory Management},
+year = {2023},
+issue_date = {October 2023},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {7},
+number = {OOPSLA2},
+url = {https://doi.org/10.1145/3622846},
+doi = {10.1145/3622846},
+abstract = {Verona is a concurrent object-oriented programming language that organises all the objects in a program into a forest of isolated regions. Memory is managed locally for each region, so programmers can control a program's memory use by adjusting objects' partition into regions, and by setting each region's memory management strategy. A thread can only mutate (allocate, deallocate) objects within one active region---its "window of mutability". Memory management costs are localised to the active region, ensuring overheads can be predicted and controlled. Moving the mutability window between regions is explicit, so code can be executed wherever it is required, yet programs remain in control of memory use. An ownership type system based on reference capabilities enforces region isolation, controlling aliasing within and between regions, yet supporting objects moving between regions and threads. Data accesses never need expensive atomic operations, and are always thread-safe.},
+journal = {Proc. ACM Program. Lang.},
+month = {oct},
+articleno = {270},
+numpages = {31},
+keywords = {type systems, ownership, memory management, isolation}
+}
+
+  
+
+
+
+  
+
 
   
 

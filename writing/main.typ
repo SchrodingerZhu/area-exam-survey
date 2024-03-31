@@ -158,7 +158,7 @@ While the powerful ownership checking mechanisms significantly improve memory sa
 
 We noticed similarity between the requirement of Rust and the RC-based memory reuse runtime. As discussed above, to achieve memory reuse, ownership of the RC-objected is transferred to the callee on each function call. If there is any pending use of the same argument object after the functional call, an explicit `clone()` must be inserted to garantee the liveness of the object. Since Rust defaults to move semantic and has a strict ownership checker, it offers free correctness assurance for the generated code. As one will see in the following sections, we will also allow object borrows in foreign language interface (FFI). Rust will also protect us from memory errors in such cases.
 
-== Straightforward Interpolation
+== Seamless Interpolation
 
 Let's take a look at a "side effect" of Rc-based reuse analysis. Linearity provides a way to hide side effects in functional programming @linear. In the case of Rc-based runtime, one can directly operate on imperative data structures with almost no extra abstraction. Consider the following code:
 
@@ -189,6 +189,17 @@ impl<T : Clone + ?Sized> Rc<T> {
 ```
 Assume we are constructing the initial data structure using `collect 10000 Vec::new`. One should notice that in this fast path, there is no `clone()` needed as the pointer to the object is always exclusive. In this way, `Rc-based` reuse analysis, provides a canonical way to convert a clonable#footnote[We assume that `clone` operation garantees that the original object and the new object should function observably in the same way.] imperative data structure to functional programming language without loosing mutability. 
 
+With Koka and Lean, this method can be used to encapsulate common data structures like dynamic array and hash tables. While being efficient, there are several caveats related to this particular method. The data structure pointer is passed across FFI, and it is up to the user to maintain the correct reference counting operations, which can be tedious and error-prone. 
+
+We hope to investigate the possibility of direct interpolation with host language. When compiling the Rust, we hope to provide a way to automatically generate necessary wrappers for mutable imperative data structures. Given proper trait bounds, such wrappers will also rule out invalid operations.
+
+As suggested in @fp2, with RC-based memory reuse runtime, functions (especially FFIs) may desire borrowed refereces for better performance. For instance, if we pass RC pointers into `length : String -> usize`, the function will have to hold the ownership and generate code related to clean up the string. A better way is to mark the `String` as passed-by-reference, which would end up with a much cleaner code. However, in Koka and Lean's FFI, every object is passed as a pointer without any safety garantee. A carelessly implemented host language function may modify the reference counter or mutate the data fields accidentally and leads to unexpected consequences. 
+
+As readers will see in @uniqueness, borrowing the idea from @Kappa, @Pony and @Verona, we have proposed a fine grained division of argument passing styles with different reference capabilities. Such division works closely with Rust's type system, assuring the correctness across host and guest languages.
+
+== Efficient HOAS
+
+== Uniqueness Type System without Isolation <uniqueness>
 
 == e.g. User Feedback
 #rect(
