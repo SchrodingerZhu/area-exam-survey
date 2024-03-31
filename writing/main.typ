@@ -6,7 +6,7 @@
 #import "typst/abstract_en.typ": *
 #import "common/metadata.typ": *
 #import "@preview/fletcher:0.4.2" as fletcher: node, edge
-
+#import "reuse.typ": reuse-section
 #titlepage(
   title: titleEnglish,
   advisor: advisor,
@@ -32,6 +32,8 @@
   author: author,
   submissionDate: submissionDate
 )
+
+#set text(font: "EB Garamond")
 
 = Introduction
 In recent years, proof assistants have surged in popularity across both academic and industrial domains. Computer scientists begin to use proof assistants to verify realistic software systems as exemplified by @Leroy-Compcert-CACM @composable-verification. Simultaneously, mathematicians are beginning to seriously integrate computer-aided proofs into their workflows @terence_tao_lean_tour @Fermat_last_theorem. Such trend leads to serious considerations for the design and implementation of high-performance functional programming languages.
@@ -116,7 +118,6 @@ $lr(bracket.l.double dot.c bracket.r.double)$, that can be efficiently evaluated
   edge(G, g, "->", "quote/reify")
 })) <NbPE-diagram>
 
-
 The provided code from @elaberation-zoo showcases a way to apply NbPE to the Untyped Lambda Calculus (UTLC):
 
 ```hs   
@@ -136,229 +137,58 @@ quote ns = \case
 
 One can observe that such operations heavily involve the elimination and introduction processes, executed in a consecutive manner.
 
-= The Memory Reuse Problem
-== The Essence of Memory Reuse
+#reuse-section
 
-In the previous section, we observed examples featuring frequent invocations of introduction and elimination processes. Within the language runtime, this translates into allocations and deallocations of memory objects. Consequently, memory reuse emerges as a crucial aspect of performance improvement. As we will explore in the following sections, this concept is reflected from various angles in runtime implementations.
+= High-level Memory Reuse Runtime
 
-== Memory Reuse in Allocators
+== Reference Counting Runtime
+Two representative languages implementations that utilize RC-based reuse analysis are Koka @perceus and Lean @lean-4. Albiet the differences in how they approach the reuse analysis, their runtime shares various common features:
 
-In the userspace of modern Unix-like operating systems, memory is typically obtained from the kernel in page granularity through system call wrappers such as mmap @mmap. However, employing mmap/munmap for each allocation and deallocation can be prohibitively expensive. In the same time, mmap can only reserve page-length virtual address spaces, potentially leading to significant fragmentation.
+1. Both languages are lowered to C or LLVM-IR directly obtained from C code, where memory management is performed with low-level pointer arithmetics.
+2. Type are erased. Runtime objects are stored in a uniform way. The runtime does not use the type info to allocate or deallocate objects. Instead, basic information such as number of fields are simply stored in an extra header field associated with the object. Runtime replies on fields scanning to accomplish recursive destruction. 
+3. Boxing and unboxing are heavily involed. To manage all language objects in a uniform way, scalar types are either tagged or boxed. This introduces extra indirections and branches during execution.
 
-To counteract these issues, userspace memory is generally managed by memory allocators, acting as a sort of cache for pages between the operating system and userspace allocations. Upon allocation, rather than directly invoking mmap, allocators opt to utilize available space in their cached pages. Conversely, upon deallocation, instead of immediately returning the page to the OS, the allocator postpones the page's release by initially placing it into the cache pool. This practice represents a lower-level form of memory reuse, aiming to repurpose available page space from previous deallocations in the hope that subsequent allocations will reuse this memory space.
+We propose a higher level runtime implementation targeting the Rust programming language. Instead of erasing types during early stage of the IR manipulation, we hope to investigate the possibility to use higher-order language features to directly manage guest language objects. By implementing such runtime, we also hope to investigate some of the open questions surrounding reuse analysis.
 
-Memory allocators, like those incorporated by libc, are often accessed by multiple threads, necessitating the global page pool to be safeguarded by mutexes or other synchronization mechanisms, thereby imposing additional costs on malloc/free operations. To circumvent this overhead, modern allocators such as mimalloc, referenced in @leijen2019mimalloc, and snmalloc, noted in @snmalloc, have introduced a concept known as freelist sharding. This approach involves segregating the page pool by different size classes, with available memory blocks being placed into local freelists initially and only transferred back to the global pool once certain conditions are met. This strategy adds an additional layer of memory reuse by considering the local context, where consecutive allocations and deallocations are capured by frequent addition and removal of memory objects from local lists, thereby achieving higher throughput.
+== Encoding Memory Reuse with Affline Linearity
 
-Especially for small allocations on the fast path, where an allocation finds a match in local freelists, the operation is exceptionally efficient; for instance, in snmalloc, there are only about 45 general instructions with just two branches, significantly fewer than what is required for the cold initialization routine.
+Rust language has a unique ownership design to garantee its memory safety. Such ownership system implicity provides similar programming model such as linear types and affine types @rust-affine. Researchers have shown the powerfulness of Rust's ownership system by developping explicit permission separation utilizing invarant lifetime markers as branded access tokens @ghost-cell.
 
-#let flowgraph = { 
-import fletcher.shapes: diamond
-  fletcher.diagram(
-    node-stroke: 1pt,
-    edge-stroke: 1pt,
-    node((0,0), [Malloc], corner-radius: 2pt, extrude: (0, 3)),
-    edge("-|>"),
-    node((0,1), align(center)[
-      Initialized?
-    ], shape: diamond),
-    edge("d", "-|>", [Yes], label-pos: 0.1),
-    node((0,2), align(center)[
-      Local freelist available?
-    ], shape: diamond),
-    edge("d", "-|>", [Yes], label-pos: 0.1),
-    node((0,3), [Return local block], corner-radius: 2pt, extrude: (0, 3)),
-  )
-  h(1cm)
-  fletcher.diagram(
-    node-stroke: 1pt,
-    edge-stroke: 1pt,
-    node((0,0), [Free], corner-radius: 2pt, extrude: (0, 3)),
-    edge("-|>"),
-    node((0,1), align(center)[
-      Is Local Block?
-    ], shape: diamond),
-    edge("d", "-|>", [Yes], label-pos: 0.1),
-    node((0,2), align(center)[
-      Local freelist not full?
-    ], shape: diamond),
-    edge("d", "-|>", [Yes], label-pos: 0.1),
-    node((0,3), [Append to local list], corner-radius: 2pt, extrude: (0, 3)),
-  )
+While the powerful ownership checking mechanisms significantly improve memory safety, it makes Rust unfriendly to be a codegen target for guest languages, as the code generator would have extra burden to garantee ownership and lifetime is handled properly.
+
+We noticed similarity between the requirement of Rust and the RC-based memory reuse runtime. As discussed above, to achieve memory reuse, ownership of the RC-objected is transferred to the callee on each function call. If there is any pending use of the same argument object after the functional call, an explicit `clone()` must be inserted to garantee the liveness of the object. Since Rust defaults to move semantic and has a strict ownership checker, it offers free correctness assurance for the generated code. As one will see in the following sections, we will also allow object borrows in foreign language interface (FFI). Rust will also protect us from memory errors in such cases.
+
+== Straightforward Interpolation
+
+Let's take a look at a "side effect" of Rc-based reuse analysis. Linearity provides a way to hide side effects in functional programming @linear. In the case of Rc-based runtime, one can directly operate on imperative data structures with almost no extra abstraction. Consider the following code:
+
+```rust
+// In Rust
+extern "rust" fn Vec::push<T>(mut v : Rc<Vec<T>>, t: T) : Rc<Vec<T>> {
+  v.make_mut().push(t);
+  v
 }
+// In an imaginary functional language
+collect : u32 -> Vec<u32> -> Vec<u32>
+collect 0 acc = acc
+collect x acc = collect (x - 1) (Vec::push acc x)
+```
+Notice that in the guest language, although the `Vec<i32>` in managed by `Rc` down to the low-level runtime, we do not explicit mark it in the high-level syntax. The `Rc::make_mut()` function is an existing function in Rust's `alloc` library, which is roughly doing the following operation:
 
-#figure(flowgraph, caption: "Fast paths for snmalloc")
-
-== Reuse Analysis
-
-=== Precise Reference Counting for Reuse Analysis
-
-Functional languages like Erlang, Haskell, and OCaml utilize sophisticated garbage collection algorithms, despite differences in their implementations, as noted in @haskell, @erlang-1, @erlang-2, @ocaml-pm, and @ocaml. These garbage collectors are all based on the generational copying GC principle. The generational approach, to some extent, mirrors reuse patterns; for instance, as discussed in @haskell, the promotion from the younger to older generations follows a tenuring model. The "weak generational hypothesis" posits that objects in the young generation are more likely to be reclaimed frequently, reflecting the transient nature of data in functional programming through the cycle of introduction and elimination.
-
-However, due to the batched nature of garbage collection, memory reuse is generally delayed, leading to potential inefficiencies when compared to imperative data structures. This is primarily because:
-
-1. Imperative data structures are usually modified in place, as opposed to being completely recreated, thus avoiding the cycle of elimination and introduction inherent in functional structures.
-2. Deallocations in imperative programming are more explicit and precise, leading to potentially more efficient memory use.
-
-To approach the functional equivalent of these characteristics, beyond efficient reclamation, one also needs to ensure the uniqueness (or exclusivity) of managed objects. Here, RC-based (Reference Counting) strategies excel, as recent works in @perceus, @frame-limited, and @fp2 have started to establish a comprehensive set of RC-based reuse analysis and optimizations.
-
-Compared to complex GC runtimes, RC is simpler and more straightforward. For example, the inductively defined integer list reversing function can be translated into Rust using `Rc` in a standard manner as illustrated:
-
-#text(size: 12pt)[
-```rs
-pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
-  match *xs {
-    List::Nil => acc,
-    List::Cons(ref x, ref xs) => 
-      everse(xs.clone(), Rc::new(List::Cons(x.clone(), acc)))
+```rust 
+impl<T : Clone + ?Sized> Rc<T> {
+  fn make_mut(&mut self) -> &mut T {
+    if Rc::strong_count(self) != 1 || Rc::weak_count(self) != 0 {
+      // clone if the RC pointer is not exclusive
+      *self = Rc::new(self.clone());
+    } 
+    // obtain a mutable referece in place
+    unsafe { &mut *(&*self as *const _ as *mut _)  }
   }
 }
 ```
-]
+Assume we are constructing the initial data structure using `collect 10000 Vec::new`. One should notice that in this fast path, there is no `clone()` needed as the pointer to the object is always exclusive. In this way, `Rc-based` reuse analysis, provides a canonical way to convert a clonable#footnote[We assume that `clone` operation garantees that the original object and the new object should function observably in the same way.] imperative data structure to functional programming language without loosing mutability. 
 
-However, with Rc, several additional operations are necessary. New memory cells must be allocated (`Rc::new`) for new objects, reference counts of existing objects must be incremented before they can be shared (`Rc::clone`), and reference counts should decrease when objects are no longer in use, potentially triggering deallocations (`Rc::drop`).
-
-In Rust and C++, `Rc` or `shared_pointer` is nothing but a normal structure defined in the standard library. Their constructions and deconstructions are treated in the same way of other objects. That is, the `drop` operation, if no explicit specified, will be inserted by the compiler when exiting the lexical scope of the `Rc` object. 
-
-Koka and Lean internalize `Rc` as a part of IR; thus allowing manipulations of the `Rc` object. In the above example, such compilers will identify the frontier of uses of the `Rc` object and insert the `drop` operations for them as soon as they are no longer being used. 
-
-#text(size: 12pt)[
-```rs
-pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
-  match *xs {
-    List::Nil => acc,
-    List::Cons(ref y, ref ys) => {
-      let y = y.clone();
-      let ys = ys.clone();
-      drop(xs);
-      reverse(ys, Rc::new(List::Cons(y, acc)))
-    }
-  }
-}
-```
-]
-This code motion has several benefits. One a memory cell is no longer referenced, it will be released before subsequent calls to constructors. Consider a data structure not widely shared, such early release together with the local freelist technique from allocators will enable possible reuse of memory cells.
-
-Unfortunately, such code motions also incur substantial costs.
-1. In Rust (and C++), `Rc` are usually constructed with the hope that it may be shared at various sites. Hence, its deallocation is annotated as a cold path, potentially confusing the branch prediction;
-2. Even though the memory reuse is possible, the calls to allocations and deallocations may not be easily canceled. C++ does permit cancellation of `new` and `delete` pairs, but the compiler support is rather restrictive;
-3. Meanwhile, such code always projects out subfields via clone operations no matter the memory reuse is feasible or not (or, whether the `Rc` is holding the exclusive reference to the object). In the case of exclusive access, there is no need to do `clone` followed by `drop` for subfields.
-
-To mitigate these issues, one can inline the destructors associated with the `List`. To make sure the memory cell is reused immediately, we also explicitly express the passing of memory. Although the following Rust code is conceptual and not directly admissible by standard Rust compilers, it serves to illustrate the underlying idea:
-
-#text(size: 12pt)[
-```rs
-pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
-  match xs {
-    List::Nil => acc,
-    List::Cons(ref y, ref ys) => {
-      let y = y.clone();
-      let ys = ys.clone();
-      let mem = if Rc::is_unique(xs) {
-        drop(y);
-        drop(ys);
-        Some(Rc::take_memory(xs))
-      } else { None };
-      reverse(ys, Rc::reuse_or_alloc(mem, List::Cons(y, acc)))
-    }
-  }
-}
-```
-]
-
-As an optimization, the `clone()` operations could be moved inside the `Rc::is_unique` branch to pair with the `drop()` operations, eliminating unnecessary cloning when the Rc is unique. This modification leads to a cleaner and more efficient path for direct memory reuse:
-
-#text(size: 12pt)[
-```rs
-pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
-  match xs {
-    List::Nil => acc,
-    List::Cons(ref y, ref ys) => {
-      let mem = if Rc::is_unique(xs) {
-        Some(Rc::take_memory(xs))
-      } else { 
-        let y = y.clone();
-        let ys = ys.clone();
-        None 
-      };
-      reverse(ys, Rc::reuse_or_alloc(mem, List::Cons(y, acc)))
-    }
-  }
-}
-```
-]
-
-=== Frame-limited Reuse Analysis
-
-To assess the potential for reusability, the initial strategy adopted in Koka, as outlined in @perceus, involves attempting to drop the memory right after pattern destruction. This action signifies the memory resource as available for reuse. This concept is closely aligned with the notion that pattern destructions serve as typical elimination points for inductive data structures. However, as highlighted in @frame-limited, this approach can encounter significant challenges that may hinder the effective reuse of memory.
-
-Consider the following conceptual code (notice that `clone()`, `drop()` are not yet inserted):
-
-#text(size: 12pt)[
-```rs 
-pub fn foo(bar: Rc<List>, baz: bool) -> Rc<List> {
-  match bar {
-    List::Cons(hd, tl) => {
-      match baz {
-        true => bar,
-        false => List::Cons(1, tl),
-      }
-    }
-    _ => omitted!()
-  }
-}
-```
-]
-
-Inserting the `drop()` operation immediately after pattern destruction is not always feasible, particularly when the variable in question is utilized within a nested branch. A viable workaround is to defer the `drop()` to subsequent layers of the program. This kind of code transformation can be systematically executed, a process that will be elaborated on in the context of "drop-guided" release analysis, as discussed in @frame-limited. Before delving into that discussion, let's examine another motivating example to further illustrate the concept.
-
-#text(size: 12pt)[
-```rs 
-pub fn foo(bar: Rc<List>, baz: bool) -> Rc<List> {
-  match bar {
-    List::Cons(_, _) => {
-      let qux = quux(bar)
-      Rc::new(Cons(qux, Nil))
-    }
-    _ => omitted!()
-  }
-}
-```
-]
-
-If the reuse analysis is too "optimistic", one may end up getting the following code:
-#text(size: 12pt)[
-```rs 
-let qux = quux(bar.clone())
-let token = drop_with_memory(bar);
-Rc::reuse_or_alloc(token, Cons(qux, Nil))
-``` 
-] 
-While this code captures the reuse opportunity, it introduces another problem. That is, even though the memory associated with `bar` may have already become available for reuse before calling `quux`, it is not released during the entire execution of `quux`. In the worst-case scenario, this could result in a continuous increase in heap usage, especially if quux is a long-running operation or if similar patterns are prevalent throughout the codebase, leading to inefficient memory utilization.
-
-@frame-limited believes that problems mentioned above fundamentally stem from a disregard for liveness in reuse analysis. The reuse analysis pass already acquire essential information of the liveness of objects. Hence, the reuse decisions  decisions should be more closely aligned with this liveness data. As shown in @analysis-flow, the proposed algorithm leverages liveness information to pinpoint the frontier where a managed object is used for the last time. Drops are inserted to such sites. In this way, if the ownership of an object is passed to another function, neither `drop()` nor `clone()` will be added, avoiding the problem in `quux(bar.clone())`. To achieve memory reuse, a `drop()` in this case, will always generate a reuse token carried by the context. Going along the control flow, if there is an allocation that is feasible to reuse memory resource carried within the context, the reuse token will be assigned to the allocation. Conversely, if there is no possible memory reuse, an additional `free()` operation will be inserted to clean up any surplus tokens.
-
-#let analysis-flow = { 
-import fletcher.shapes: diamond
-  fletcher.diagram(
-    node-stroke: 1pt,
-    edge-stroke: 1pt,
-    node((0,0), [Input IR], corner-radius: 2pt, extrude: (0, 3)),
-    edge("->"),
-    node((1,0), align(center)[
-      Last Use Frontier
-    ]),
-    edge("->", label-pos: 0.1),
-    node((2,0), align(center)[
-      Insert Drop
-    ]),
-    edge("->", label-pos: 0.1),
-    node((3, 0), [Pair Possible Reuse], ),
-  )
-}
-#figure(
-analysis-flow,
-caption: "Frame-limited Reuse Analysis Flow"
-)<analysis-flow>
 
 == e.g. User Feedback
 #rect(
