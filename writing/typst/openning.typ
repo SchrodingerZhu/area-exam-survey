@@ -28,6 +28,6 @@
   )
   v(1cm)
   text[
-    There have always been ghosts in the machine. Random segments of code, that have grouped together to form unexpected protocols. Unanticipated, these free radicals engender questions of free will, creativity, and even the nature of what we might call the soul (I, Robot).
+    There have always been ghosts in the machine. Random segments of code, that have grouped together to form unexpected protocols. Unanticipated, these free radicals engender questions of free will, creativity, and even the nature of what we might call the soul. #h(1fr)(I, Robot)
   ]
 }
