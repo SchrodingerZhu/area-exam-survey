@@ -226,9 +226,57 @@ for (Ready<T0>, Ready<T1>, Ready<T2>, Hole<T3>) {
 
 Elements inside the parameter tuple is marked with either `Ready` or `Hole` to represent whether the positional argument is supplied or not. The associated type `Progress` denotes the next state to transit when a further argument is supplied. One should notice that this design fits the RC-based reuse analysis properly: when an additional argument is supplied, the closure will check if it holds the exclusive reference to the underlying `Thunk`. If the reference is unique, it either updates he parameter pack in place  or consumes the `code` field direcly, depending on whether this `params` are full. Otherwise, `clone()` operation will be performed. Such `clone()` is shallow since values are captured as `Rc`-managed objects or scalars --- there is no need for recursive `clone()`.
 
-We have exprimented the proposed implementation with sample codegen results. Tests are passed under Rust's mid-level IR interpreter @Miri. There is no undefined behavior or other memory errors. 
+We have experimented the proposed implementation with sample codegen results. Tests are passed under Rust's mid-level IR interpreter @Miri. There is no undefined behavior or other memory errors. 
  
 == Uniqueness Type System without Isolation <uniqueness>
+
+The following Lean4 code adds $1.0$ to all elements inside a `FloatArray` that stores elements in a fixed size contiguous memory area. 
+
+```lean
+partial def add1(x : FloatArray) : FloatArray :=
+  let rec loop (r : FloatArray) (i : Nat) : FloatArray :=
+    if h : i < r.size then
+      let idx : Fin r.size := ⟨ i, h ⟩
+      loop (r.set idx (r.get idx + 1.0)) (i+1)
+    else
+      r
+  loop x 0
+```
+
+Notice that we have carefully crafted the code such that there is no boundary checking. Ideally, with trivial tail-call optimization, the above code should be transformed into a loop feasible for SIMD vectorization. Indeed, `leanc` will transform the code above into the following `C` code where updates are happening in loop.
+
+```c
+LEAN_EXPORT lean_object *l_add1_loop(lean_object *x_1, lean_object *x_2) {
+_start: {
+  lean_object *x_3;
+  uint8_t x_4;
+  x_3 = lean_float_array_size(x_1);
+  x_4 = lean_nat_dec_lt(x_2, x_3);
+  lean_dec(x_3);
+  if (x_4 == 0) {
+    lean_dec(x_2);
+    return x_1;
+  } else {
+    double x_5;
+    double x_6;
+    double x_7;
+    lean_object *x_8;
+    lean_object *x_9;
+    lean_object *x_10;
+    x_5 = lean_float_array_fget(x_1, x_2);
+    x_6 = l_add1_loop___closed__1;
+    x_7 = lean_float_add(x_5, x_6);
+    x_8 = lean_float_array_fset(x_1, x_2, x_7);
+    x_9 = lean_unsigned_to_nat(1u);
+    x_10 = lean_nat_add(x_2, x_9);
+    lean_dec(x_2);
+    x_1 = x_8;
+    x_2 = x_10;
+    goto _start;
+  }
+}
+}
+```
 
 == Open Type Parameters
 
