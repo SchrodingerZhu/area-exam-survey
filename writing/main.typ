@@ -160,8 +160,7 @@ We noticed similarity between the requirement of Rust and the RC-based memory re
 
 == Seamless Interpolation
 
-Let's take a look at a "side effect" of Rc-based reuse analysis. Linearity provides a way to hide side effects in functional programming @linear. In the case of Rc-based runtime, one can directly operate on imperative data structures with almost no extra abstraction. Consider the following code:
-
+Let's take a look at a "side effect" of Rc-based reuse analysis. Linearity provides a way to hide side effects in functional programming @linear. In the context of an Rc-based runtime, this approach enables direct manipulation of imperative data structures with minimal additional abstraction. This is illustrated with the following examples:
 ```rust
 // In Rust
 extern "rust" fn Vec::push<T>(mut v : Rc<Vec<T>>, t: T) : Rc<Vec<T>> {
@@ -198,6 +197,10 @@ As suggested in @fp2, with RC-based memory reuse runtime, functions (especially 
 As readers will see in @uniqueness, borrowing the idea from @Kappa, @Pony and @Verona, we have proposed a fine grained division of argument passing styles with different reference capabilities. Such division works closely with Rust's type system, assuring the correctness across host and guest languages.
 
 == Efficient HOAS
+
+High Order Abstract Syntax (HOAS), as discussed in @hoas, is a methodology to represent guest language structure directly using high-level constructions in host language. For example, instead of using traditional AST to represent the lambda expression, the guest lambda can be directly encoded as a host lambda when feasible. 
+
+Lambda expressions are indeed one of the most complicated runtime features. As first-class construction in functional programming, lambda expression demands sophisticated runtime support, such as partial application.
 
 == Uniqueness Type System without Isolation <uniqueness>
 
