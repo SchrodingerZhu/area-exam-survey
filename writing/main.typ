@@ -200,9 +200,39 @@ As readers will see in @uniqueness, borrowing the idea from @Kappa, @Pony and @V
 
 High Order Abstract Syntax (HOAS), as discussed in @hoas, is a methodology to represent guest language structure directly using high-level constructions in host language. For example, instead of using traditional AST to represent the lambda expression, the guest lambda can be directly encoded as a host lambda when feasible. 
 
-Lambda expressions are indeed one of the most complicated runtime features. As first-class construction in functional programming, lambda expression demands sophisticated runtime support, such as partial application.
+Lambda expressions are indeed one of the most complicated runtime features. As first-class construction in functional programming, lambda expression demands sophisticated runtime support, such as variable catpure and partial application. In Lean4, the runtime has a special `lean_closure_object` consisting of plain function pointers and additional heap space for captured objects. Since object's type is erased upon capture, Lean4 created a "uniform ABI" where all values used by the lambda are boxed, including managed objects and scalar values. This creates two further complications. First, an indirection layer for boxed function call must be created for normal functions, as they may also be used as lambdas. Second, passing scalars may result in counter-intuitive overheads including tagging and memory allocation.
 
+We have investigated the possibility of using Rust's closure to directly encode guest's lambda expression. With this setting, Rc-managed objects and scalar values can be directly captured into `Rc<dyn BoxedClosure<P, R>>` object, where `P` is a list of parameters and `R` is the return type. The trait bound of `BoxedClosure<P, R>` is implemented for `Thunk`. The dynamic trait object is desired here. One can associate wrappers around plain functions or closures with the trait bound. In either way, it can be passed or stored uniformly as an object.
+
+```rs
+pub struct Thunk<F, P: PartialParams, R>
+where
+    F: FnOnce(P::Full) -> R + Clone,
+{
+    code: F,
+    params: P,
+}
+```
+As shown in the code above, a `Thunk` is just a Rust `FnOnce` object (it can either be a closure or a plain function closure, but must be decided statically), associated with a tuple of parameters representing the partial application status. 
+
+
+```rs
+impl<T0: Clone, T1: Clone, T2: Clone, T3: Clone> PartialParams
+for (Ready<T0>, Ready<T1>, Ready<T2>, Hole<T3>) {
+    type Pending = (T3,);
+    type Progress = (Ready<T0>, Ready<T1>, Ready<T2>, Ready<T3>);
+}
+```
+
+Elements inside the parameter tuple is marked with either `Ready` or `Hole` to represent whether the positional argument is supplied or not. The associated type `Progress` denotes the next state to transit when a further argument is supplied. One should notice that this design fits the RC-based reuse analysis properly: when an additional argument is supplied, the closure will check if it holds the exclusive reference to the underlying `Thunk`. If the reference is unique, it either updates he parameter pack in place  or consumes the `code` field direcly, depending on whether this `params` are full. Otherwise, `clone()` operation will be performed. Such `clone()` is shallow since values are captured as `Rc`-managed objects or scalars --- there is no need for recursive `clone()`.
+
+We have exprimented the proposed implementation with sample codegen results. Tests are passed under Rust's mid-level IR interpreter @Miri. There is no undefined behavior or other memory errors. 
+ 
 == Uniqueness Type System without Isolation <uniqueness>
+
+== Open Type Parameters
+
+== Memory Reuse Fusion and Specialization
 
 == e.g. User Feedback
 #rect(
