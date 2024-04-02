@@ -349,8 +349,8 @@ Together with the discussion in @interpolation, our framework supports three sor
   caption: [Reference Sorts]
 ) <reference-diagram>
 
-- `Rc<T>` is the traditional reference to a managed object.
-- `Unique<T>` can only be used in function parameters (not materializable as object fields). It is used to denote the exclusivity statically as discussed above.
+- `Rc<T>` is the traditional RC pointer to a managed object.
+- `Unique<T>` can only be used in function parameters (not materializable as object fields). It is used to denote the exclusivity statically as discussed above. A possible runtime implementation is to add a wrapper to the `Rc<T>` with compiler instrinsics hinting the exclusivity (such as `llvm.assume` and `llvm.unreachable`).  
 - `&T` represents a borrowed reference to the object. As mentioned in @interpolation, such borrowed references can be used in FFI. When compiling to Rust, the reference is translated as a reference to the underlying value inside the `Rc` managed area. This setting automatically makes sure that safe FFI cannot manipulate the reference counting of the memory object, avoiding interference to the reuse analysis. 
 
 == Open Type Parameters
