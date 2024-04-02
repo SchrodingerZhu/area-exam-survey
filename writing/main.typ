@@ -6,6 +6,7 @@
 #import "typst/abstract_en.typ": *
 #import "common/metadata.typ": *
 #import "@preview/fletcher:0.4.2" as fletcher: node, edge
+#import "@preview/curryst:0.2.0" as curryst: rule, proof-tree
 #import "reuse.typ": reuse-section
 #titlepage(
   title: titleEnglish,
@@ -355,6 +356,97 @@ Together with the discussion in @interpolation, our framework supports three sor
 
 == Open Type Parameters
 
+#let basic-eq = curryst.rule(
+  label: [$PP_equiv$],
+  [$P_0 equiv P_1$],
+  [$ell(P_0) = ell(P_1)$],
+)
+#let basic-neq = curryst.rule(
+  label: [$PP_equiv.not$],
+  [$P_0 equiv.not P_1$],
+  [$ell(P_0) eq.not ell(P_1)$],
+)
+#let var-sim = curryst.rule(
+  label: [$VV_tilde.equiv$],
+  [$V_0 tilde.equiv V_1$],
+)
+#let sum-equiv = curryst.rule(
+  label: [$plus_equiv$],
+  [$A_0 + B_0 equiv A_1 + B_1$],
+  [$A_0 equiv A_1$],
+  [$B_0 equiv B_1$],
+)
+#let sum-ne-l = curryst.rule(
+  label: [$plus_(equiv.not,L)$],
+  [$A_0 + B_0 equiv.not A_1 + B_1$],
+  [$A_0 equiv.not A_1$],
+)
+#let sum-ne-r = curryst.rule(
+  label: [$plus_(equiv.not,R)$],
+  [$A_0 + B_0 equiv.not A_1 + B_1$],
+  [$B_0 equiv.not B_1$],
+)
+#let sum-sim-l = curryst.rule(
+  label: [$plus_(tilde.equiv,L)$],
+  [$A_0 + B_0 tilde.equiv A_1 + B_1$],
+  [$A_0 tilde.equiv A_1$],
+  [$B_0 equiv B_1$],
+)
+#let sum-sim-r = curryst.rule(
+  label: [$plus_(tilde.equiv,R)$],
+  [$A_0 + B_0 tilde.equiv A_1 + B_1$],
+  [$A_0 equiv A_1$],
+  [$B_0 tilde.equiv B_1$],
+)
+#let sum-sim = curryst.rule(
+  label: [$plus_(tilde.equiv)$],
+  [$A_0 + B_0 tilde.equiv A_1 + B_1$],
+  [$A_0 tilde.equiv A_1$],
+  [$B_0 tilde.equiv B_1$],
+)
+#let prod-equiv = curryst.rule(
+  label: [$times_equiv$],
+  [$A_0 times B_0 equiv A_1 times B_1$],
+  [$A_0 equiv A_1$],
+  [$B_0 equiv B_1$],
+)
+#let prod-ne-l = curryst.rule(
+  label: [$times_(equiv.not,L)$],
+  [$A_0 times B_0 equiv.not A_1 times B_1$],
+  [$A_0 equiv.not A_1$],
+)
+#let prod-ne-r = curryst.rule(
+  label: [$times_(equiv.not,R)$],
+  [$A_0 times B_0 equiv.not A_1 times B_1$],
+  [$B_0 equiv.not B_1$],
+)
+#let prod-sim-l = curryst.rule(
+  label: [$times_(tilde.equiv,L)$],
+  [$A_0 times B_0 tilde.equiv A_1 times B_1$],
+  [$A_0 tilde.equiv A_1$],
+  [$B_0 equiv B_1$],
+)
+#let prod-sim-r = curryst.rule(
+  label: [$times_(tilde.equiv,R)$],
+  [$A_0 times B_0 tilde.equiv A_1 times B_1$],
+  [$A_0 equiv A_1$],
+  [$B_0 tilde.equiv B_1$],
+)
+#let prod-sim = curryst.rule(
+  label: [$times_(tilde.equiv)$],
+  [$A_0 times B_0 tilde.equiv A_1 times B_1$],
+  [$A_0 tilde.equiv A_1$],
+  [$B_0 tilde.equiv B_1$],
+)
+#figure(
+text(size: 9pt)[
+$
+#curryst.proof-tree(basic-eq)   #curryst.proof-tree(basic-neq) 
+#curryst.proof-tree(var-sim) \
+#curryst.proof-tree(sum-equiv) #curryst.proof-tree(sum-ne-l) #curryst.proof-tree(sum-ne-r) \ #curryst.proof-tree(sum-sim-l) #curryst.proof-tree(sum-sim-r) #curryst.proof-tree(sum-sim) \
+#curryst.proof-tree(prod-equiv) #curryst.proof-tree(prod-ne-l) #curryst.proof-tree(prod-ne-r) \ #curryst.proof-tree(prod-sim-l) #curryst.proof-tree(prod-sim-r) #curryst.proof-tree(prod-sim)
+$
+], caption: [Inference Rules for Shape Analysis])
 == Memory Reuse Fusion and Specialization
 
 = Open Problems
