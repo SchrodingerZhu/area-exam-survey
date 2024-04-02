@@ -688,6 +688,38 @@ year = {2024},
 url = {https://github.com/rust-lang/miri}
 }
 
+@inproceedings{Uniqueness,
+author = {Haller, Philipp and Odersky, Martin},
+title = {Capabilities for uniqueness and borrowing},
+year = {2010},
+isbn = {3642141064},
+publisher = {Springer-Verlag},
+address = {Berlin, Heidelberg},
+abstract = {An important application of unique object references is safe and efficient message passing in concurrent object-oriented programming. However, to prevent the ill effects of aliasing, practical systems often severely restrict the shape of messages passed by reference. Moreover, the problematic interplay between destructive reads-often used to implement unique references-and temporary aliasing through "borrowed" references is exacerbated in a concurrent setting, increasing the potential for unpredictable run-time errors.This paper introduces a new approach to uniqueness. The idea is to use capabilities for enforcing both at-most-once consumption of unique references, and a flexible notion of uniqueness. The main novelty of our approach is a model of uniqueness and borrowing based on simple, unstructured capabilities. The advantages are: first, it provides simple foundations for uniqueness and borrowing. Second, it can be formalized using a relatively simple type system, for which we provide a complete soundness proof. Third, it avoids common problems involving borrowing and destructive reads, since unique references subsume borrowed references.We have implemented our type system as an extension to Scala. Practical experience suggests that our system allows type checking real-world actor-based concurrent programs with only a small number of additional type annotations.},
+booktitle = {Proceedings of the 24th European Conference on Object-Oriented Programming},
+pages = {354–378},
+numpages = {25},
+location = {Maribor, Slovenia},
+series = {ECOOP'10}
+}
+
+@InProceedings{LinearUnique,
+author="Marshall, Daniel
+and Vollmer, Michael
+and Orchard, Dominic",
+editor="Sergey, Ilya",
+title="Linearity and Uniqueness: An Entente Cordiale",
+booktitle="Programming Languages and Systems",
+year="2022",
+publisher="Springer International Publishing",
+address="Cham",
+pages="346--375",
+abstract="Substructural type systems are growing in popularity because they allow for a resourceful interpretation of data which can be used to rule out various software bugs. Indeed, substructurality is finally taking hold in modern programming; Haskell now has linear types roughly based on Girard's linear logic but integrated via graded function arrows, Clean has uniqueness types designed to ensure that values have at most a single reference to them, and Rust has an intricate ownership system for guaranteeing memory safety. But despite this broad range of resourceful type systems, there is comparatively little understanding of their relative strengths and weaknesses or whether their underlying frameworks can be unified. There is often confusion about whether linearity and uniqueness are essentially the same, or are instead `dual' to one another, or somewhere in between. This paper formalises the relationship between these two well-studied but rarely contrasted ideas, building on two distinct bodies of literature, showing that it is possible and advantageous to have both linear and unique types in the same type system. We study the guarantees of the resulting system and provide a practical implementation in the graded modal setting of the Granule language, adding a third kind of modality alongside coeffect and effect modalities. We then demonstrate via a benchmark that our implementation benefits from expected efficiency gains enabled by adding uniqueness to a language that already has a linear basis.",
+isbn="978-3-030-99336-8"
+}
+
+
+
   
 
 

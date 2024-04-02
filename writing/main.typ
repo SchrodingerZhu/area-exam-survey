@@ -141,7 +141,7 @@ One can observe that such operations heavily involve the elimination and introdu
 
 = High-level Memory Reuse Runtime
 
-== Reference Counting Runtime
+== Reference Counting Runtime without Type Erasure <no-erasure>
 Two representative languages implementations that utilize RC-based reuse analysis are Koka @perceus and Lean @lean-4. Albiet the differences in how they approach the reuse analysis, their runtime shares various common features:
 
 1. Both languages are lowered to C or LLVM-IR directly obtained from C code, where memory management is performed with low-level pointer arithmetics.
@@ -149,6 +149,46 @@ Two representative languages implementations that utilize RC-based reuse analysi
 3. Boxing and unboxing are heavily involed. To manage all language objects in a uniform way, scalar types are either tagged or boxed. This introduces extra indirections and branches during execution.
 
 We propose a higher level runtime implementation targeting the Rust programming language. Instead of erasing types during early stage of the IR manipulation, we hope to investigate the possibility to use higher-order language features to directly manage guest language objects. By implementing such runtime, we also hope to investigate some of the open questions surrounding reuse analysis.
+
+The frontend of a guest language can generate IR to provide function and inductive type definitions. Our framework will perform a series of operations to deliver final output in Rust. As one can see from the demo below, the IR itself can contain meta variables, which makes the frontend translation easier. As a side note, one should also notice that CFG on this IR is of tree structures, as there is no loop in functional programming. When lowering the code to Rust, however, the backend can create loops with tail-call optimization pass.
+
+#text(size: 10pt)[
+```rust
+module test {
+    enum List<T>
+        where @T: Foo
+    { Nil, Cons(@T, List<@T>) }
+    fn test<T>(%1: i32, %2: f64) -> i32 
+      where @T: std::TraitFoo + std::TraitBar<Head = ()> 
+    {
+        %3 = constant 3 : i32;
+        return %3;
+    }
+    fn test2<T : Ord>(%0 : @T, %1 : @T) -> List<@T> {
+        %2 = %0 < %1;
+        %3 = new List::Nil;
+        if %2 {
+          %4 = new List::Cons, %0, %3
+          return %4;
+        } else {
+          %5 = new List::Cons, %0, %1;
+          return %5;
+        }
+    }
+}
+```
+]
+
+We plan to implement the reuse analysis and code lowering in a multi-pass manner. Some highlights are listed as the following:
+
+1. *type inference*: Infer types for operands. This pass also checks that function calls and basic operations are well-formed.
+2. *liveness analysis*: Detect the last-use frontier for operands. After this pass, explicit `drop()` operations will be inserted.
+3. *clone analysis*: Check multiple uses on a single managed object and insert `clone()` accordingly.
+4. *shape analysis*: Analyze the memory layout of managed objects.
+5. *reuse pairing*: Decide proper memory reuse and pair reuse tokens with allocations.
+6. *specialization and other optimizations*: Other optimizations such as in-place updates and tail-call recursion.
+
+In the following sections, we highlights the problems we want to investigate with our proposed framework.
 
 == Encoding Memory Reuse with Affline Linearity
 
@@ -158,7 +198,7 @@ While the powerful ownership checking mechanisms significantly improve memory sa
 
 We noticed similarity between the requirement of Rust and the RC-based memory reuse runtime. As discussed above, to achieve memory reuse, ownership of the RC-objected is transferred to the callee on each function call. If there is any pending use of the same argument object after the functional call, an explicit `clone()` must be inserted to garantee the liveness of the object. Since Rust defaults to move semantic and has a strict ownership checker, it offers free correctness assurance for the generated code. As one will see in the following sections, we will also allow object borrows in foreign language interface (FFI). Rust will also protect us from memory errors in such cases.
 
-== Seamless Interpolation
+== Seamless Interpolation <interpolation>
 
 Let's take a look at a "side effect" of Rc-based reuse analysis. Linearity provides a way to hide side effects in functional programming @linear. In the context of an Rc-based runtime, this approach enables direct manipulation of imperative data structures with minimal additional abstraction. This is illustrated with the following examples:
 ```rust
@@ -172,7 +212,7 @@ collect : u32 -> Vec<u32> -> Vec<u32>
 collect 0 acc = acc
 collect x acc = collect (x - 1) (Vec::push acc x)
 ```
-Notice that in the guest language, although the `Vec<i32>` in managed by `Rc` down to the low-level runtime, we do not explicit mark it in the high-level syntax. The `Rc::make_mut()` function is an existing function in Rust's `alloc` library, which is roughly doing the following operation:
+Notice that in the guest language, although the `Vec<i32>` is managed by `Rc` down to the low-level runtime, we do not explicit mark it in the high-level syntax. The `Rc::make_mut()` function is an existing function in Rust's `alloc` library, which is roughly doing the following operation:
 
 ```rust 
 impl<T : Clone + ?Sized> Rc<T> {
@@ -278,39 +318,50 @@ _start: {
 }
 ```
 
+However, there are several issues stop `add1` from being vectorized. The first problem is that, along the loop, there are two `lean_dec` operation. This is because the loop indice variable can be potentially boxed in Lean. Such operations can be eliminated with our framework, since we will actively avoid boxing and unboxing as described in @no-erasure.
+
+The other problem is less trivial and harder to resolve. `lean_float_array_fset` and `lean_float_array_fget` are mutation operations on imperative data structures. From @interpolation, we have learned such operations incur a check on exclusivity and a potential slow path that clones the underlying data. Vectorizer cannot conduct optimizations due to the existence of these cold routines.
+
+A straightforward solution is to have uniqueness in type system @Uniqueness @LinearUnique. With proper annotations from users, the compiler can statically determine the uniqueness (or exclusivity) of objects. Thus, extraneous checks on uniqueness can be removed together with slow paths. Such type systems, however, usually suffer from the "coloring" problem. Once a function is colored as requiring uniqueness or linearity on its input, it acquires substantial efforts to passing data between "colored" worlds and "uncolored" worlds. @fp2, on the other hand, provides special annotations that let compilers assist users to check the correctness of their uniqueness markers, thus garantees that in-place updates are indeed performed as expected. Such approach, however, does not solve the "coloring" problem.
+
+We propose an eaiser approach to incorporate static uniqueness into our runtime. We also assume that users are capable of providing uniqueness performance critial routines by marking input parameters as unique. Notice that, our RC-based runtime provides two operations: (1) checking the exclusivity of a RC reference, and (2) obtaining shallow copies of a managed object. These two operations enable easy transitions between "colored" and "uncolored" functions. Upon calling a function that demands uniqueness, the compiler inserts a check on the uniqueness of the objects and use shallow copy to obtain a new exclusively owned object if necessary. In this way, one can lift the checks in loop out of the body, leaving a clean code path for further optimization opportunities. What's more, calling between "colored" and "uncolored" functions do not require explicit users' efforts.
+
+Together with the discussion in @interpolation, our framework supports three sorts of references. Their conversions are detailed in @reference-diagram.
+
+#let ref-diagram = { 
+  let RC = (-1, -1)
+  let Unique = (-1, 1)
+  let Ref = (1, 0)
+  fletcher.diagram(
+    node-stroke: 1pt,
+    edge-stroke: 1pt,
+    node(RC, "Rc<T>"),
+    node(Unique, "Unique<T>"),
+    node(Ref, "&T"),
+    edge(RC, Unique, "-|>", [uniquefy], label-pos: 0.1),
+    edge(Unique, RC, "-|>", [direct cast], label-pos: 0.1),
+    edge(RC, Ref, "-|>", bend: 30deg, [borrow]),
+    edge(Unique, Ref, "-|>", bend: -30deg, [borrow]),
+  )
+}
+#figure(
+  ref-diagram,
+  caption: [Reference Sorts]
+) <reference-diagram>
+
+- `Rc<T>` is the traditional reference to a managed object.
+- `Unique<T>` can only be used in function parameters (not materializable as object fields). It is used to denote the exclusivity statically as discussed above.
+- `&T` represents a borrowed reference to the object. As mentioned in @interpolation, such borrowed references can be used in FFI. When compiling to Rust, the reference is translated as a reference to the underlying value inside the `Rc` managed area. This setting automatically makes sure that safe FFI cannot manipulate the reference counting of the memory object, avoiding interference to the reuse analysis. 
+
 == Open Type Parameters
 
 == Memory Reuse Fusion and Specialization
 
-== e.g. User Feedback
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This section would summarize the concept User Feedback using definitions, historical overviews and pointing out the most important aspects of User Feedback.
-]
+= Open Problems
 
-== e.g. Representational State Transfer
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This section would summarize the architectural style Representational State Transfer (REST) using definitions, historical overviews and pointing out the most important aspects of the architecture.
-]
+== Optimal Pairing for Memory Reuse 
+== GC Integration
 
-== e.g. Scrum
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This section would summarize the agile method Scrum using definitions, historical overviews and pointing out the most important aspects of Scrum.
-]
 
 = Related Work
 #rect(

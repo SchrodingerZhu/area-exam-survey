@@ -82,7 +82,7 @@ pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
 
 However, with Rc, several additional operations are necessary. New memory cells must be allocated (`Rc::new`) for new objects, reference counts of existing objects must be incremented before they can be shared (`Rc::clone`), and reference counts should decrease when objects are no longer in use, potentially triggering deallocations (`Rc::drop`).
 
-In Rust and C++, `Rc` or `shared_pointer` is nothing but a normal structure defined in the standard library. Their constructions and deconstructions are treated in the same way of other objects. That is, the `drop` operation, if no explicit specified, will be inserted by the compiler when exiting the lexical scope of the `Rc` object. 
+In Rust and C++, `Rc` or `shared_ptr` is nothing but a normal structure defined in the standard library. Their constructions and deconstructions are treated in the same way of other objects. That is, the `drop` operation, if no explicit specified, will be inserted by the compiler when exiting the lexical scope of the `Rc` object. 
 
 Koka and Lean internalize `Rc` as a part of IR; thus allowing manipulations of the `Rc` object. In the above example, such compilers will identify the frontier of uses of the `Rc` object and insert the `drop` operations for them as soon as they are no longer being used. 
 
