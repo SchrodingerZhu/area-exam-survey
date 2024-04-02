@@ -43,7 +43,7 @@ An emerging challenge lies in efficiently managing memory resources for function
 
 The memory resources of functional languages are typically managed by garbage collectors. Depending on different user scenarios, various implementations may configure their collection algorithms with distinct characteristics, as evidenced by the diverse approaches in @haskell, @ocaml, @ocaml-pm, @erlang-1, and @erlang-2. Despite these differences, these advanced collection algorithms universally adopt generational approaches, underscoring the significance of locality and efficient memory reuse in frequently accessed (hot) regions. Recently developed languages like Koka and Lean 4 have illuminated the potential of combining RC-based (Reference Counting) runtime and reuse analysis to achieve in-place mutability within a purely functional environment, as indicated by @lean-4 @perceus @frame-limited @fp2. Researchers have termed this innovative approach as the "functional-but-in-place" (FBIP) paradigm. 
 
-This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new RC-based methods. Furthermore, this work will suggest potential enhancements to address existing challenges in reuse analysis and the RC-based runtime framework.
+This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new RC-based methods. Furthermore, by proposing a high-level runtime in Rust, this work will suggest potential enhancements to address existing challenges in reuse analysis and the RC-based runtime framework.
 
 = Functional Programming
 == A Brief Overview
@@ -354,7 +354,7 @@ Together with the discussion in @interpolation, our framework supports three sor
 - `Unique<T>` can only be used in function parameters (not materializable as object fields). It is used to denote the exclusivity statically as discussed above. A possible runtime implementation is to add a wrapper to the `Rc<T>` with compiler instrinsics hinting the exclusivity (such as `llvm.assume` and `llvm.unreachable`).  
 - `&T` represents a borrowed reference to the object. As mentioned in @interpolation, such borrowed references can be used in FFI. When compiling to Rust, the reference is translated as a reference to the underlying value inside the `Rc` managed area. This setting automatically makes sure that safe FFI cannot manipulate the reference counting of the memory object, avoiding interference to the reuse analysis. 
 
-== Open Type Parameters
+== Open Type Parameters <open-type>
 
 #let basic-eq = curryst.rule(
   label: [$PP_equiv$],
@@ -365,6 +365,10 @@ Together with the discussion in @interpolation, our framework supports three sor
   label: [$PP_equiv.not$],
   [$P_0 equiv.not P_1$],
   [$ell(P_0) eq.not ell(P_1)$],
+)
+#let var-eq = curryst.rule(
+  label: [$VV_equiv$],
+  [$V_0 equiv V_0$],
 )
 #let var-sim = curryst.rule(
   label: [$VV_tilde.equiv$],
@@ -438,389 +442,101 @@ Together with the discussion in @interpolation, our framework supports three sor
   [$A_0 tilde.equiv A_1$],
   [$B_0 tilde.equiv B_1$],
 )
+#let inference-rules = {
+let pt = curryst.proof-tree;
+$
+#pt(basic-eq)   #pt(basic-neq)  #pt(var-sim) #pt(var-eq)  \
+#pt(sum-equiv)  #pt(sum-ne-l)   #pt(sum-ne-r)  \ 
+#pt(sum-sim-l)  #pt(sum-sim-r)  #pt(sum-sim)   \
+#pt(prod-equiv) #pt(prod-ne-l)  #pt(prod-ne-r) \ 
+#pt(prod-sim-l) #pt(prod-sim-r) #pt(prod-sim)
+$
+}
+
+As proposed in @no-erasure, our IR supports meta variables. While meta variables provide a straightforward way to translate guest language polymorphism into host language polymorphism, it complicates the reuse analysis, especially in the shape analysis pass. 
+
+If type variable appears in a managed object, its memory layout may not be decidable during static analysis. To accommodate meta variables, we introduce a novel algorithm to decide the feasibility for memory reuse.
+
+Assume types are inductively defined using primitive types $P_i in PP$, meta variables $V_i in VV$, together with product $A times B$ and sum $A + B$ operations. We say type $A$ and $B$ are of the equivalent shape ($A equiv B$) if both $A$ and $B$ are closed types without any meta variable, which means both $A$ and $B$ are of statically decidable memory layouts and their layouts are the same. Otherwise, if any component decidably differ in memory layout, the composite types in comparison (or primitive types if there is only a single component) do not have equivalent shapes ($A equiv.not B$). However, when meta variables are involved, we additionally say that $A$ and $B$ are of similar shapes ($A tilde.equiv B$) if their shapes are equivalent with compatible meta variable substitution. Similar shapes also imply possibility for memory reuse. 
+
+@inference-rules summarizes the inference rules for deciding shape equivalence. It's noteworthy that for sum types, Rust can employ advanced layout optimizations to devise the most compact and efficient memory layout possible. The nuances such as the number and order of operands can be relevant when deciding the layout. Therefore, for both sum and product types, the equivalence checking algorithm behaves similarly to "alpha-equivalence" (structurely identical except for meta variables) checking.  There may be more fine-grained ways to decide the shape equivalence of types, potentially leading to more reuse opportunities. For now, we leave such algorithms for future study. 
+
 #figure(
-text(size: 9pt)[
-$
-#curryst.proof-tree(basic-eq)   #curryst.proof-tree(basic-neq) 
-#curryst.proof-tree(var-sim) \
-#curryst.proof-tree(sum-equiv) #curryst.proof-tree(sum-ne-l) #curryst.proof-tree(sum-ne-r) \ #curryst.proof-tree(sum-sim-l) #curryst.proof-tree(sum-sim-r) #curryst.proof-tree(sum-sim) \
-#curryst.proof-tree(prod-equiv) #curryst.proof-tree(prod-ne-l) #curryst.proof-tree(prod-ne-r) \ #curryst.proof-tree(prod-sim-l) #curryst.proof-tree(prod-sim-r) #curryst.proof-tree(prod-sim)
-$
-], caption: [Inference Rules for Shape Analysis])
+text(size: 9pt, inference-rules), caption: [Inference Rules for Shape Analysis ($ell$ is the static memory layout function)]) <inference-rules>
+
+For types with similar shapes, the analysis pass cannot direcly decide reusability. Hence, we will need to emit Rust code to check the compatibility of memory layout. One can optimistically generate reuse token, but drop the token and allocate appropriate memory area if layout does not match. Fortunately, such checks are static with respect to Rust's compiler. By putting up checks properly, there can be no overhead at all.
+
 == Memory Reuse Fusion and Specialization
+
+Another complication for RC-based high-level memory reuse runtime arises from abstraction of RC pointers. We have illustrated that both Koka and Lean make memory reuse possible by internalizing RC operations as intrinsics in IR. In our framework, we also use such intrinsics in IR. When lowering into Rust, however, to achieve seamless interpolation as promised in @interpolation, managed objects are simply materialized as normal language objects (`Rc<T>`). 
+
+We want to highlight that by providing enough facilities around `Rc<T>`, one can embed the memory reuse operations into the host language. For instance, when mutate imperative data structures, `Rc::make_mut()` is used to garantee exclusive access to objects. Besides, one can also utilize `drop()`, `clone()` provided by Rust itself, together with `drop_for_reuse()`, `Rc::reuse_or_alloc()` provided by our framework to achieve memory management.
+
+Optimal codegen requires specializations. For instance, one can identify field update operations and skip over all the elimination and introduction procedures. 
+
+Specifically, we demonstrate a special case to fuse memory management operations. Recall the conceptual code obtained by inlining destruction procedures:
+
+```rs
+List::Cons(ref y, ref ys) => {
+  let y = y.clone();
+  let ys = ys.clone();
+  let mem = if Rc::is_unique(xs) {
+    drop(y);
+    drop(ys);
+    Some(Rc::take_memory(xs))
+  } else { None };
+  reverse(ys, Rc::reuse_or_alloc(mem, List::Cons(y, acc)))
+}
+```
+The fusion step will push down the `clone()` operations and cancel them with `drop()` on the fast path. However, this is not direcly approachable in rust, since later on, when constructing `List::Cons(y, acc)`, we still need to value bounded to `y`. There is no easy way to remove extra cost due to `clone()`.
+
+Fortunately, Rust provides `Rc::unwrap()` operation. Addtionally, we can provides `Rc::unwrap_for_reuse()`. With exclusive access, such functions simply move the values out of the RC-managed memory area and generate reuse tokens. Otherwise, they clone the values. In either way, one will get a value rather than RC reference for the underlying object.
+
+```rust
+List::Cons(..) => {
+  let (token, List::Cons(y, ys)) 
+    = Rc::unwrap_for_reuse(xs) else { core::hint::unreachable() };
+  reverse(ys, Rc::reuse_or_alloc(mem, List::Cons(y, acc)))
+}
+```
+
+Such operations provide a one-step fusion for memory reuse on the fast path.
 
 = Open Problems
 
+In this section, we will discuss aspects that are not studied in this work but remain interesting for future exploration. 
+
+== Dataflow Formulation <dataflow-formulation>
+
+For functional programming languages, typical control flow graphs are directed trees. In our framework, the ways to form branches are also limited to elimination rules (including the if-then-else branch for booleans).
+
+In general settings, the CFG can be much more complicated. One way to proceed is to employ control flow analysis (CFA) @cf-analysis, where information associated with code points are organized in lattices and special join/meet operations are developed to handle multiple in-degrees and loops. 
+
+Reuse analysis resembles CFA in the sense that a drop operating creates an available memory token. Such tokens are carried in context until being consumed at an allocation site. 
+
+The dataflow formulation is interesting as it can extend our proposed framework to support imperative programming languages where RC objects are internalized in IR.
+
 == Optimal Pairing for Memory Reuse 
+
+As discussed in @copy-avoidance, if there are multiple memory tokens and allocation sites in context, deciding optimal memory reuse pairing to avoid copy is a NP-Hard problem. 
+
+Koka and Lean utilize simple heuristics such as preference to reuse tokens from same types. These heuristics will typically lead to good enough choices. However, we think it is of academic value to investigate constained memory reuse problem. As mentioned in @frame-limited, frame-limitation is an important property that we want to preserve during pairing memory tokens, since it rules out nondeterministic heap growth. It is noteworthy that frame-limitation cut off possible reuse choices, as memory tokens should not propogate long distances. Hence, one can explore the possibility to have efficient algorithms that decide optimal memory token assignment under frame-limited settings.
+
+@dataflow-formulation proposed general reuse analysis as a dataflow problem. If we can to achieve optimality with CFA, the cost model of reuse token assignments must be carefully designed such that the model can converge with iterative evaluation.
+
+Memory reuse is an optimistic optimization that speeds up the fast path. Without doubt, such optimizations incur extra costs on slow routines. @open-type described the open type problems, which adds more probabilistic ingredients into the problem. As such, an optimal memory reuse decision should consider the gap between optimistic expectation and realistic execution. Profile-guided optimization can be an interesting approach for future exploration.
+
 == GC Integration
 
+RC-based memory management policy suffers from cyclic reference problem, where objects organized in cycles are permanently leaked. It is not a problem for purely functional programming languages with only (co-)inductively defined data types. However, special local and global mutable reference are also widely adopted in various functional languages, that can potentially lead to cycles.
 
-= Related Work
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Describe related work regarding your topic and emphasize your (scientific) contribution in contrast to existing approaches / concepts / workflows. Related work is usually current research by others and you defend yourself against the statement: “Why is your thesis relevant? The problem was al- ready solved by XYZ.” If you have multiple related works, use subsections to separate them.
-]
+The sites that possibly form cycles can be identified with careful design. However, it remains an open problem to find good choices for handling cycles. When using functional programming for concurrency, purely RC-based approach may not be desirable due to considerable overhead from atomic operations. All these issues suggest that one might investigate integrating GC and RC together and conditonally switching between them. Some pioneering works are done in @NIM @ORCA. 
 
-= Requirements Analysis
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This chapter follows the Requirements Analysis Document Template in @bruegge2004object. Important: Make sure that the whole chapter is independent of the chosen technology and development platform. The idea is that you illustrate concepts, taxonomies and relationships of the application domain independent of the solution domain! Cite @bruegge2004object several times in this chapter.
+RC has already been heavily employed in modern garbage collectors, as in @lxr @rc-immix. These approaches usually utilize very small referece counters and once an object is upgraded to GC management due to overflow, the ownership and exclusivity information is permanently lost. Thus, a proper way to preserve information for memory reuse remains to be discovered.
 
-]
+= Conclusion
 
-== Overview
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Provide a short overview about the purpose, scope, objectives and success criteria of the system that you like to develop.
-]
 
-== Current System
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This section is only required if the proposed system (i.e. the system that you develop in the thesis) should replace an existing system.
-]
+We have delved into the essence of memory reuse by examining the fundamental rules that underpin computations in functional programming. Bearing this essence in mind, this work introduces a novel approach that compiles RC-based memory reuse from guest languages to high-level languages, such as Rust, with an emphasis on robustness and efficiency. Throughout our design process, we encountered several challenges, including the avoidance of type erasure, navigating the move semantics of the host language, compiling with higher-order abstract syntax (HOAS), handling interpolation, ensuring uniqueness typing, addressing open type problems, and implementing specializations with reuse fusion.
 
-== Proposed System
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: If you leave out the section “Current system”, you can rename this section into “Requirements”.
-]
-
-=== Functional Requirements
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: List and describe all functional requirements of your system. Also mention requirements that you were not able to realize. The short title should be in the form “verb objective”
-
-  - FR1 Short Title: Short Description. 
-  - FR2 Short Title: Short Description. 
-  - FR3 Short Title: Short Description.
-]
-
-=== Nonfunctional Requirements
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: List and describe all nonfunctional requirements of your system. Also mention requirements that you were not able to realize. Categorize them using the FURPS+ model described in @bruegge2004object without the category functionality that was already covered with the functional requirements.
-
-  - NFR1 Category: Short Description. 
-  - NFR2 Category: Short Description. 
-  - NFR3 Category: Short Description.
-
-]
-
-== System Models
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This section includes important system models for the requirements analysis.
-]
-
-=== Scenarios
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: If you do not distinguish between visionary and demo scenarios, you can remove the two subsubsections below and list all scenarios here.
-
-  *Visionary Scenarios*
-
-  Note: Describe 1-2 visionary scenario here, i.e. a scenario that would perfectly solve your problem, even if it might not be realizable. Use free text description.
-
-  *Demo Scenarios*
-
-  Note: Describe 1-2 demo scenario here, i.e. a scenario that you can implement and demonstrate until the end of your thesis. Use free text description.
-]
-
-=== Use Case Model
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This subsection should contain a UML Use Case Diagram including roles and their use cases. You can use colors to indicate priorities. Think about splitting the diagram into multiple ones if you have more than 10 use cases. *Important:* Make sure to describe the most important use cases using the use case table template (./tex/use-case-table.tex). Also describe the rationale of the use case model, i.e. why you modeled it like you show it in the diagram.
-
-]
-
-=== Analysis Object Model
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This subsection should contain a UML Class Diagram showing the most important objects, attributes, methods and relations of your application domain including taxonomies using specification inheritance (see @bruegge2004object). Do not insert objects, attributes or methods of the solution domain. *Important:* Make sure to describe the analysis object model thoroughly in the text so that readers are able to understand the diagram. Also write about the rationale how and why you modeled the concepts like this.
-
-]
-
-=== Dynamic Model
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This subsection should contain dynamic UML diagrams. These can be a UML state diagrams, UML communication diagrams or UML activity diagrams.*Important:* Make sure to describe the diagram and its rationale in the text. *Do not use UML sequence diagrams.*
-]
-
-=== User Interface
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Show mockups of the user interface of the software you develop and their connections / transitions. You can also create a storyboard. *Important:* Describe the mockups and their rationale in the text.
-]
-
-= System Design
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This chapter follows the System Design Document Template in @bruegge2004object. You describe in this chapter how you map the concepts of the application domain to the solution domain. Some sections are optional, if they do not apply to your problem. Cite @bruegge2004object several times in this chapter.
-]
-
-== Overview
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Provide a brief overview of the software architecture and references to other chapters (e.g. requirements analysis), references to existing systems, constraints impacting the software architecture..
-]
-
-== Design Goals
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Derive design goals from your nonfunctional requirements, prioritize them (as they might conflict with each other) and describe the rationale of your prioritization. Any trade-offs between design goals (e.g., build vs. buy, memory space vs. response time), and the rationale behind the specific solution should be described in this section
-]
-
-== Subsytem Decomposition
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Describe the architecture of your system by decomposing it into subsys- tems and the services provided by each subsystem. Use UML class diagrams including packages / components for each subsystem.
-]
-
-== Hardware Software Mapping
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This section describes how the subsystems are mapped onto existing hardware and software components. The description is accompanied by a UML deployment diagram. The existing components are often off-the-shelf components. If the components are distributed on different nodes, the network infrastructure and the protocols are also described.
-]
-
-== Persistent Data Management
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Optional section that describes how data is saved over the lifetime of the system and which data. Usually this is either done by saving data in structured files or in databases. If this is applicable for the thesis, describe the approach for persisting data here and show a UML class diagram how the entity objects are mapped to persistent storage. It contains a rationale of the selected storage scheme, file system or database, a description of the selected database and database administration issues.
-]
-
-== Access Control
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Optional section describing the access control and security issues based on the nonfunctional requirements in the requirements analysis. It also de- scribes the implementation of the access matrix based on capabilities or access control lists, the selection of authentication mechanisms and the use of en- cryption algorithms.
-]
-
-== Global Software Control
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Optional section describing the control flow of the system, in particular, whether a monolithic, event-driven control flow or concurrent processes have been selected, how requests are initiated and specific synchronization issues
-]
-
-== Boundry Conditions
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Optional section describing the use cases how to start up the separate components of the system, how to shut them down, and what to do if a component or the system fails.
-]
-
-= Case Study / Evaluation
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: If you did an evaluation / case study, describe it here.
-]
-
-== Design 
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Describe the design / methodology of the evaluation and why you did it like that. E.g. what kind of evaluation have you done (e.g. questionnaire, personal interviews, simulation, quantitative analysis of metrics, what kind of participants, what kind of questions, what was the procedure?
-]
-
-== Objectives
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Derive concrete objectives / hypotheses for this evaluation from the general ones in the introduction.
-]
-
-== Results
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Summarize the most interesting results of your evaluation (without interpretation). Additional results can be put into the appendix.
-]
-
-== Findings
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Interpret the results and conclude interesting findings
-]
-
-== Discussion
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Discuss the findings in more detail and also review possible disadvantages that you found
-]
-
-== Limitations
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Describe limitations and threats to validity of your evaluation, e.g. reliability, generalizability, selection bias, researcher bias
-]
-
-= Summary
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: This chapter includes the status of your thesis, a conclusion and an outlook about future work.
-]
-
-== Status
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Describe honestly the achieved goals (e.g. the well implemented and tested use cases) and the open goals here. if you only have achieved goals, you did something wrong in your analysis.
-]
-
-=== Realized Goals
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Summarize the achieved goals by repeating the realized requirements or use cases stating how you realized them.
-]
-
-=== Open Goals
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Summarize the open goals by repeating the open requirements or use cases and explaining why you were not able to achieve them. Important: It might be suspicious, if you do not have open goals. This usually indicates that you did not thoroughly analyze your problems.
-]
-
-== Conclusion
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Recap shortly which problem you solved in your thesis and discuss your *contributions* here.
-]
-
-== Future Work
-#rect(
-  width: 100%,
-  radius: 10%,
-  stroke: 0.5pt,
-  fill: yellow,
-)[
-  Note: Tell us the next steps (that you would do if you have more time). Be creative, visionary and open-minded here.
-]
+Additionally, we have identified open problems related to dataflow cost modeling and the integration of garbage collection (GC) mechanisms. As proof assistants and other related applications continue to evolve, the demand for increasingly sophisticated functional programming capabilities grows. We believe that our framework holds significant value for both the academic and industrial sectors, offering a potent tool for enhancing the efficiency and effectiveness of functional programming languages in managing memory reuse.

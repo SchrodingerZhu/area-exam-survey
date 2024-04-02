@@ -77,17 +77,17 @@
   )
 
   // List of tables.
-  pagebreak()
-  heading(numbering: none)[List of Tables]
-  outline(
-    title: "",
-    target: figure.where(kind: table)
-  )
+  // pagebreak()
+  // heading(numbering: none)[List of Tables]
+  // outline(
+  //   title: "",
+  //   target: figure.where(kind: table)
+  // )
 
   // Appendix.
-  pagebreak()
-  heading(numbering: none)[Appendix A: Supplementary Material]
-  include("typst/appendix.typ")
+  // pagebreak()
+  // heading(numbering: none)[Appendix A: Supplementary Material]
+  // include("typst/appendix.typ")
 
   pagebreak()
   bibliography("main.bib")

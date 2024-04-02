@@ -326,22 +326,22 @@ location = {San Diego, CA, USA},
 series = {PLDI 2022}
 }
 
-@inproceedings{immix,
-author = {Blackburn, Stephen M. and McKinley, Kathryn S.},
-title = {Immix: a mark-region garbage collector with space efficiency, fast collection, and mutator performance},
-year = {2008},
-isbn = {9781595938602},
+@inproceedings{rc-immix,
+author = {Shahriyar, Rifat and Blackburn, Stephen Michael and Yang, Xi and McKinley, Kathryn S.},
+title = {Taking off the gloves with reference counting Immix},
+year = {2013},
+isbn = {9781450323741},
 publisher = {Association for Computing Machinery},
 address = {New York, NY, USA},
-url = {https://doi.org/10.1145/1375581.1375586},
-doi = {10.1145/1375581.1375586},
-abstract = {Programmers are increasingly choosing managed languages for modern applications, which tend to allocate many short-to-medium lived small objects. The garbage collector therefore directly determines program performance by making a classic space-time tradeoff that seeks to provide space efficiency, fast reclamation, and mutator performance. The three canonical tracing garbage collectors: semi-space, mark-sweep, and mark-compact each sacrifice one objective. This paper describes a collector family, called mark-region, and introduces opportunistic defragmentation, which mixes copying and marking in a single pass. Combining both, we implement immix, a novel high performance garbage collector that achieves all three performance objectives. The key insight is to allocate and reclaim memory in contiguous regions, at a coarse block grain when possible and otherwise in groups of finer grain lines. We show that immix outperforms existing canonical algorithms, improving total application performance by 7 to 25\% on average across 20 benchmarks. As the mature space in a generational collector, immix matches or beats a highly tuned generational collector, e.g. it improves jbb2000 by 5\%. These innovations and the identification of a new family of collectors open new opportunities for garbage collector design.},
-booktitle = {Proceedings of the 29th ACM SIGPLAN Conference on Programming Language Design and Implementation},
-pages = {22–32},
-numpages = {11},
-keywords = {sweep-to-region, sweep-to-free-list, semi-space, mark-sweep, mark-region, locality, immix, free-list, fragmentation, compaction},
-location = {Tucson, AZ, USA},
-series = {PLDI '08}
+url = {https://doi.org/10.1145/2509136.2509527},
+doi = {10.1145/2509136.2509527},
+abstract = {Despite some clear advantages and recent advances, reference counting remains a poor cousin to high-performance tracing garbage collectors. The advantages of reference counting include a) immediacy of reclamation, b) incrementality, and c) local scope of its operations. After decades of languishing with hopelessly bad performance, recent work narrowed the gap between reference counting and the fastest tracing collectors to within 10\%. Though a major advance, this gap remains a substantial barrier to adoption in performance-conscious application domains. Our work identifies heap organization as the principal source of the remaining performance gap. We present the design, implementation, and analysis of a new collector, RC Immix, that replaces reference counting's traditional free-list heap organization with the line and block heap structure introduced by the Immix collector. The key innovations of RC Immix are 1) to combine traditional reference counts with per-line live object counts to identify reusable memory and 2) to eliminate fragmentation by integrating copying with reference counting of new objects and with backup tracing cycle collection. In RC Immix, reference counting offers efficient collection and the line and block heap organization delivers excellent mutator locality and efficient allocation. With these advances, RC Immix closes the 10\% performance gap, matching the performance of a highly tuned production generational collector. By removing the performance barrier, this work transforms reference counting into a serious alternative for meeting high performance objectives for garbage collected languages.},
+booktitle = {Proceedings of the 2013 ACM SIGPLAN International Conference on Object Oriented Programming Systems Languages \& Applications},
+pages = {93–110},
+numpages = {18},
+keywords = {reference counting, mark-region, immix, defragmentation},
+location = {Indianapolis, Indiana, USA},
+series = {OOPSLA '13}
 }
 
 @article{hoas,
@@ -716,6 +716,59 @@ address="Cham",
 pages="346--375",
 abstract="Substructural type systems are growing in popularity because they allow for a resourceful interpretation of data which can be used to rule out various software bugs. Indeed, substructurality is finally taking hold in modern programming; Haskell now has linear types roughly based on Girard's linear logic but integrated via graded function arrows, Clean has uniqueness types designed to ensure that values have at most a single reference to them, and Rust has an intricate ownership system for guaranteeing memory safety. But despite this broad range of resourceful type systems, there is comparatively little understanding of their relative strengths and weaknesses or whether their underlying frameworks can be unified. There is often confusion about whether linearity and uniqueness are essentially the same, or are instead `dual' to one another, or somewhere in between. This paper formalises the relationship between these two well-studied but rarely contrasted ideas, building on two distinct bodies of literature, showing that it is possible and advantageous to have both linear and unique types in the same type system. We study the guarantees of the resulting system and provide a practical implementation in the graded modal setting of the Granule language, adding a third kind of modality alongside coeffect and effect modalities. We then demonstrate via a benchmark that our implementation benefits from expected efficiency gains enabled by adding uniqueness to a language that already has a linear basis.",
 isbn="978-3-030-99336-8"
+}
+
+@inproceedings{cf-analysis,
+author = {Allen, Frances E.},
+title = {Control flow analysis},
+year = {1970},
+isbn = {9781450373869},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/800028.808479},
+doi = {10.1145/800028.808479},
+abstract = {Any static, global analysis of the expression and data relationships in a program requires a knowledge of the control flow of the program. Since one of the primary reasons for doing such a global analysis in a compiler is to produce optimized programs, control flow analysis has been embedded in many compilers and has been described in several papers. An early paper by Prosser [5] described the use of Boolean matrices (or, more particularly, connectivity matrices) in flow analysis. The use of “dominance” relationships in flow analysis was first introduced by Prosser and much expanded by Lowry and Medlock [6]. References [6,8,9] describe compilers which use various forms of control flow analysis for optimization. Some recent developments in the area are reported in [4] and in [7].The underlying motivation in all the different types of control flow analysis is the need to codify the flow relationships in the program. The codification may be in connectivity matrices, in predecessor-successor tables, in dominance lists, etc. Whatever the form, the purpose is to facilitate determining what the flow relationships are; in other words to facilitate answering such questions as: is this an inner loop?, if an expression is removed from the loop where can it be correctly and profitably placed?, which variable definitions can affect this use?In this paper the basic control flow relationships are expressed in a directed graph. Various graph constructs are then found and shown to codify interesting global relationships.},
+booktitle = {Proceedings of a Symposium on Compiler Optimization},
+pages = {1–19},
+numpages = {19},
+location = {Urbana-Champaign, Illinois}
+}
+
+@INBOOK{copy-avoidance,
+  author={Warren, David S.},
+  booktitle={Logic Programming: Proceedings of the Tenth International Conference on Logic Programming June 21-24, 1993, Budapest, Hungary}, 
+  title={On Copy Avoidance in Single Assignment Languages}, 
+  year={1993},
+  volume={},
+  number={},
+  pages={393-407},
+  keywords={},
+  doi={}}
+
+@misc{NIM,
+  title = {Introduction to ARC/ORC in Nim},
+  url = {https://nim-lang.org/blog/2020/10/15/introduction-to-arc-orc-in-nim.html},
+  author = {Danil Yarantsev},
+  year = {2020},
+  }
+
+@article{ORCA,
+author = {Clebsch, Sylvan and Franco, Juliana and Drossopoulou, Sophia and Yang, Albert Mingkun and Wrigstad, Tobias and Vitek, Jan},
+title = {Orca: GC and type system co-design for actor languages},
+year = {2017},
+issue_date = {October 2017},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {1},
+number = {OOPSLA},
+url = {https://doi.org/10.1145/3133896},
+doi = {10.1145/3133896},
+abstract = {ORCA is a concurrent and parallel garbage collector for actor programs, which does not require any STW steps, or synchronization mechanisms, and that has been designed to support zero-copy message passing and sharing of mutable data. ORCA is part of a runtime for actor-based languages, which was co-designed with the Pony programming language, and in particular, with its data race free type system. By co-designing an actor language with its runtime, it was possible to exploit certain language properties in order to optimize performance of garbage collection. Namely, ORCA relies on the guarantees of absence of race conditions in order to avoid read/write barriers, and it leverages the actor message passing, for synchronization among actors. In this paper we briefly describe Pony and its type system. We use pseudo-code in order to introduce how ORCA allocates and deallocates objects, how it shares mutable data without requiring barriers upon data mutation, and how can immutability be used to further optimize garbage collection. Moreover, we discuss the advantages of co-designing an actor language with its runtime, and we demonstrate that ORCA can be implemented in a performant and scalable way through a set of micro-benchmarks, including a comparison with other well-known collectors.},
+journal = {Proc. ACM Program. Lang.},
+month = {oct},
+articleno = {72},
+numpages = {28},
+keywords = {actors, messages}
 }
 
 
