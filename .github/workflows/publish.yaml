@@ -26,6 +26,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: Nightly
-          body: Intelligence cannot be present without understanding. No computer has any awareness of what it does.
+          body: We know that God exists because mathematics is consistent and we know that the devil exists because we cannot prove the consist.
           files: writing/main.pdf
