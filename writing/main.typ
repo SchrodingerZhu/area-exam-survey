@@ -41,9 +41,9 @@ Efficient memory management and locality optimization remain central to the evol
 
 An emerging challenge lies in efficiently managing memory resources for functional languages. Essentially, the memory management policy must address rapid allocations and deallocations to enhance memory reuse and locality. In a general context, global allocators strive to adapt to these patterns by establishing various levels of free lists, as discussed in @locality-alloc @leijen2019mimalloc @snmalloc. Functional programming, distinguished by its inherent immutability, requires even more frequent memory reuse to accommodate its specific needs.
 
-The memory resources of functional languages are typically managed by garbage collectors. Depending on different user scenarios, various implementations may configure their collection algorithms with distinct characteristics, as evidenced by the diverse approaches in @haskell, @ocaml, @ocaml-pm, @erlang-1, and @erlang-2. Despite these differences, these advanced collection algorithms universally adopt generational approaches, underscoring the significance of locality and efficient memory reuse in frequently accessed (hot) regions. Recently developed languages like Koka and Lean 4 have illuminated the potential of combining RC-based (Reference Counting) runtime and reuse analysis to achieve in-place mutability within a purely functional environment, as indicated by @lean-4 @perceus @frame-limited @fp2. Researchers have termed this innovative approach as the "functional-but-in-place" (FBIP) paradigm. 
+The memory resources of functional languages are typically managed by garbage collectors. Depending on different user scenarios, various implementations may configure their collection algorithms with distinct characteristics, as evidenced by the diverse approaches in @haskell, @ocaml, @ocaml-pm, @erlang-1, and @erlang-2. Despite these differences, these advanced collection algorithms universally adopt generational approaches, underscoring the significance of locality and efficient memory reuse in frequently accessed (hot) regions. Recently developed languages like Koka and Lean 4 have illuminated the potential of combining Rc-based (Reference Counting) runtime and reuse analysis to achieve in-place mutability within a purely functional environment, as indicated by @lean-4 @perceus @frame-limited @fp2. Researchers have termed this innovative approach as the "functional-but-in-place" (FBIP) paradigm. 
 
-This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new RC-based methods. Furthermore, by proposing a high-level runtime in Rust, this work will suggest potential enhancements to address existing challenges in reuse analysis and the RC-based runtime framework.
+This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new Rc-based methods. Furthermore, by proposing a high-level runtime in Rust, this work will suggest potential enhancements to address existing challenges in reuse analysis and the Rc-based runtime framework.
 
 = Functional Programming
 == A Brief Overview
@@ -143,13 +143,13 @@ One can observe that such operations heavily involve the elimination and introdu
 = High-level Memory Reuse Runtime
 
 == Reference Counting Runtime without Type Erasure <no-erasure>
-Two representative languages implementations that utilize RC-based reuse analysis are Koka @perceus and Lean @lean-4. Albiet the differences in how they approach the reuse analysis, their runtime shares various common features:
+Two representative languages implementations that utilize Rc-based reuse analysis are Koka @perceus and Lean @lean-4. Albiet the differences in how they approach the reuse analysis, their runtime shares various common features:
 
 1. Both languages are lowered to C or LLVM-IR directly obtained from C code, where memory management is performed with low-level pointer arithmetics.
 2. Type are erased. Runtime objects are stored in a uniform way. The runtime does not use the type info to allocate or deallocate objects. Instead, basic information such as number of fields are simply stored in an extra header field associated with the object. Runtime replies on fields scanning to accomplish recursive destruction. 
 3. Boxing and unboxing are heavily involed. To manage all language objects in a uniform way, scalar types are either tagged or boxed. This introduces extra indirections and branches during execution.
 
-We propose a higher level runtime implementation targeting the Rust programming language. Instead of erasing types during early stage of the IR manipulation, we hope to investigate the possibility to use higher-order language features to directly manage guest language objects. By implementing such runtime, we also hope to investigate some of the open questions surrounding reuse analysis.
+We propose a higher level runtime implementation targeting the Rust programming language. Instead of erasing types during early stage of the IR manipulation, we hope to investigate the possibility to use higher-level language features to directly manage guest language objects. By implementing such runtime, we also hope to investigate some of the open questions surrounding reuse analysis.
 
 The frontend of a guest language can generate IR to provide function and inductive type definitions. Our framework will perform a series of operations to deliver final output in Rust. As one can see from the demo below, the IR itself can contain meta variables, which makes the frontend translation easier. As a side note, one should also notice that CFG on this IR is of tree structures, as there is no loop in functional programming. When lowering the code to Rust, however, the backend can create loops with tail-call optimization pass.
 
@@ -180,7 +180,7 @@ module test {
 ```
 ]
 
-We plan to implement the reuse analysis and code lowering in a multi-pass manner. Some highlights are listed as the following:
+We plan to implement the reuse analysis and code lowering in a multi-pass manner. Some key steps are listed as the following:
 
 1. *type inference*: Infer types for operands. This pass also checks that function calls and basic operations are well-formed.
 2. *liveness analysis*: Detect the last-use frontier for operands. After this pass, explicit `drop()` operations will be inserted.
@@ -189,7 +189,7 @@ We plan to implement the reuse analysis and code lowering in a multi-pass manner
 5. *reuse pairing*: Decide proper memory reuse and pair reuse tokens with allocations.
 6. *specialization and other optimizations*: Other optimizations such as in-place updates and tail-call recursion.
 
-In the following sections, we highlights the problems we want to investigate with our proposed framework.
+In the following sections, we highlights the problems we want to investigate with our proposed framework and some proposed solutions.
 
 == Encoding Memory Reuse with Affline Linearity
 
@@ -197,7 +197,7 @@ Rust language has a unique ownership design to garantee its memory safety. Such 
 
 While the powerful ownership checking mechanisms significantly improve memory safety, it makes Rust unfriendly to be a codegen target for guest languages, as the code generator would have extra burden to garantee ownership and lifetime is handled properly.
 
-We noticed similarity between the requirement of Rust and the RC-based memory reuse runtime. As discussed above, to achieve memory reuse, ownership of the RC-objected is transferred to the callee on each function call. If there is any pending use of the same argument object after the functional call, an explicit `clone()` must be inserted to garantee the liveness of the object. Since Rust defaults to move semantic and has a strict ownership checker, it offers free correctness assurance for the generated code. As one will see in the following sections, we will also allow object borrows in foreign language interface (FFI). Rust will also protect us from memory errors in such cases.
+We noticed similarity between the requirement of Rust and the Rc-based memory reuse runtime. As discussed above, to achieve memory reuse, ownership of the Rc-managed object is transferred to the callee on each function call. If there is any pending use of the same argument object after the functional call, an explicit `clone()` must be inserted to garantee the liveness of the object. Since Rust defaults to move semantic and has a strict ownership checker, it offers free correctness assurance for the generated code. As one will see in the following sections, we will also allow object borrows in foreign language interface (FFI). Rust will also protect us from memory errors in such cases.
 
 == Seamless Interpolation <interpolation>
 
@@ -219,7 +219,7 @@ Notice that in the guest language, although the `Vec<i32>` is managed by `Rc` do
 impl<T : Clone + ?Sized> Rc<T> {
   fn make_mut(&mut self) -> &mut T {
     if Rc::strong_count(self) != 1 || Rc::weak_count(self) != 0 {
-      // clone if the RC pointer is not exclusive
+      // clone if the Rc pointer is not exclusive
       *self = Rc::new(self.clone());
     } 
     // obtain a mutable referece in place
@@ -233,7 +233,7 @@ With Koka and Lean, this method can be used to encapsulate common data structure
 
 We hope to investigate the possibility of direct interpolation with host language. When compiling the Rust, we hope to provide a way to automatically generate necessary wrappers for mutable imperative data structures. Given proper trait bounds, such wrappers will also rule out invalid operations.
 
-As suggested in @fp2, with RC-based memory reuse runtime, functions (especially FFIs) may desire borrowed refereces for better performance. For instance, if we pass RC pointers into `length : String -> usize`, the function will have to hold the ownership and generate code related to clean up the string. A better way is to mark the `String` as passed-by-reference, which would end up with a much cleaner code. However, in Koka and Lean's FFI, every object is passed as a pointer without any safety garantee. A carelessly implemented host language function may modify the reference counter or mutate the data fields accidentally and leads to unexpected consequences. 
+As suggested in @fp2, with Rc-based memory reuse runtime, functions (especially FFIs) may desire borrowed refereces for better performance. For instance, if we pass Rc pointers into `length : String -> usize`, the function will have to hold the ownership and generate code related to clean up the string. A better way is to mark the `String` as passed-by-reference, which would end up with a much cleaner code. However, in Koka and Lean's FFI, every object is passed as a pointer without any safety garantee. A carelessly implemented host language function may modify the reference counter or mutate the data fields accidentally and leads to unexpected consequences. 
 
 As readers will see in @uniqueness, borrowing the idea from @Kappa, @Pony and @Verona, we have proposed a fine grained division of argument passing styles with different reference capabilities. Such division works closely with Rust's type system, assuring the correctness across host and guest languages.
 
@@ -241,7 +241,17 @@ As readers will see in @uniqueness, borrowing the idea from @Kappa, @Pony and @V
 
 High Order Abstract Syntax (HOAS), as discussed in @hoas, is a methodology to represent guest language structure directly using high-level constructions in host language. For example, instead of using traditional AST to represent the lambda expression, the guest lambda can be directly encoded as a host lambda when feasible. 
 
-Lambda expressions are indeed one of the most complicated runtime features. As first-class construction in functional programming, lambda expression demands sophisticated runtime support, such as variable catpure and partial application. In Lean4, the runtime has a special `lean_closure_object` consisting of plain function pointers and additional heap space for captured objects. Since object's type is erased upon capture, Lean4 created a "uniform ABI" where all values used by the lambda are boxed, including managed objects and scalar values. This creates two further complications. First, an indirection layer for boxed function call must be created for normal functions, as they may also be used as lambdas. Second, passing scalars may result in counter-intuitive overheads including tagging and memory allocation.
+Lambda expressions are indeed one of the most complicated runtime features. As first-class construction in functional programming, lambda expression demands sophisticated runtime support, such as variable capture and partial application. In Lean4, the runtime has a special `lean_closure_object` consisting of plain function pointers and additional heap space for captured objects. Since object's type is erased upon capture, Lean4 created a "uniform ABI" where all values used by the lambda are boxed, including managed objects and scalar values. This creates two further complications. First, an indirection layer for boxed function call must be created for normal functions, as they may also be used as lambdas. Second, passing scalars may result in counter-intuitive overheads including tagging and memory allocation.
+
+```c
+typedef struct {
+    lean_object   m_header;
+    void *        m_fun;
+    uint16_t      m_arity;     
+    uint16_t      m_num_fixed;
+    lean_object * m_objs[0];
+} lean_closure_object;
+```
 
 We have investigated the possibility of using Rust's closure to directly encode guest's lambda expression. With this setting, Rc-managed objects and scalar values can be directly captured into `Rc<dyn BoxedClosure<P, R>>` object, where `P` is a list of parameters and `R` is the return type. The trait bound of `BoxedClosure<P, R>` is implemented for `Thunk`. The dynamic trait object is desired here. One can associate wrappers around plain functions or closures with the trait bound. In either way, it can be passed or stored uniformly as an object.
 
@@ -265,7 +275,23 @@ for (Ready<T0>, Ready<T1>, Ready<T2>, Hole<T3>) {
 }
 ```
 
-Elements inside the parameter tuple is marked with either `Ready` or `Hole` to represent whether the positional argument is supplied or not. The associated type `Progress` denotes the next state to transit when a further argument is supplied. One should notice that this design fits the RC-based reuse analysis properly: when an additional argument is supplied, the closure will check if it holds the exclusive reference to the underlying `Thunk`. If the reference is unique, it either updates he parameter pack in place  or consumes the `code` field direcly, depending on whether this `params` are full. Otherwise, `clone()` operation will be performed. Such `clone()` is shallow since values are captured as `Rc`-managed objects or scalars --- there is no need for recursive `clone()`.
+Elements inside the parameter tuple is tagged with either `Ready` or `Hole` to represent whether the positional argument is supplied or not. The associated type `Progress` denotes the next state to transit when a further argument is supplied. One should notice that this design fits the Rc-based reuse analysis properly: when an additional argument is supplied, the closure will check if it holds the exclusive reference to the underlying `Thunk`. If the reference is unique, it either updates he parameter pack in place or consumes the `code` field direcly, depending on whether this `params` are full. Otherwise, `clone()` operation will be performed. Such `clone()` is shallow since values are captured as `Rc`-managed objects or scalars --- there is no need for recursive `clone()`.
+
+Guest language closures can be directly translated to clsoure syntax in IR, which,in turn, can be translated to Host languages' closures.
+
+```rust
+module test {
+  fn test() -> fn (i32, i32) -> i32 {
+    %0 = constant 991208 : i32;
+    %1 = (%2 : i32, %3 : i32) -> i32 {
+      %4 = %2 + %3;
+      %5 = %4 + %0;
+      return %5;
+    };
+    return %1;
+  }
+}
+```
 
 We have experimented the proposed implementation with sample codegen results. Tests are passed under Rust's mid-level IR interpreter @Miri. There is no undefined behavior or other memory errors. 
  
@@ -319,34 +345,34 @@ _start: {
 }
 ```
 
-However, there are several issues stop `add1` from being vectorized. The first problem is that, along the loop, there are two `lean_dec` operation. This is because the loop indice variable can be potentially boxed in Lean. Such operations can be eliminated with our framework, since we will actively avoid boxing and unboxing as described in @no-erasure.
+However, there are several issues stop `add1` from being vectorized. The first problem is that, along the loop, there are two `lean_dec` operation. This is because loop index variables can be potentially boxed in Lean. Such operations can be eliminated with our framework, since we will actively avoid boxing and unboxing as described in @no-erasure.
 
 The other problem is less trivial and harder to resolve. `lean_float_array_fset` and `lean_float_array_fget` are mutation operations on imperative data structures. From @interpolation, we have learned such operations incur a check on exclusivity and a potential slow path that clones the underlying data. Vectorizer cannot conduct optimizations due to the existence of these cold routines.
 
 A straightforward solution is to have uniqueness in type system @Uniqueness @LinearUnique. With proper annotations from users, the compiler can statically determine the uniqueness (or exclusivity) of objects. Thus, extraneous checks on uniqueness can be removed together with slow paths. Such type systems, however, usually suffer from the "coloring" problem. Once a function is colored as requiring uniqueness or linearity on its input, it acquires substantial efforts to passing data between "colored" worlds and "uncolored" worlds. @fp2, on the other hand, provides special annotations that let compilers assist users to check the correctness of their uniqueness markers, thus garantees that in-place updates are indeed performed as expected. Such approach, however, does not solve the "coloring" problem.
 
-We propose a more friendly approach to incorporate static uniqueness into our runtime. We also assume that users are capable of specifying uniqueness requirements in performance critial routines. Notice that, our RC-based runtime provides two operations: (1) checking the exclusivity of a RC reference, and (2) obtaining shallow copies of a managed object. These two operations enable easy transitions between "colored" and "uncolored" functions. Upon calling a function that demands uniqueness, the compiler inserts a check on the uniqueness of the objects and use shallow copy to obtain a new exclusively owned object if necessary. In this way, one can lift the checks in loop out of the body, leaving a clean code path for further optimization opportunities. What's more, calling between "colored" and "uncolored" functions do not require explicit users' efforts.
+We propose a more friendly approach to incorporate static uniqueness into our runtime. We also assume that users are capable of specifying uniqueness requirements in performance critial routines. Notice that, our Rc-based runtime provides two operations: (1) checking the exclusivity of a Rc reference, and (2) obtaining shallow copies of a managed object. These two operations enable easy transitions between "colored" and "uncolored" functions. Upon calling a function that demands uniqueness, the compiler inserts a check on the uniqueness of the objects and use shallow copy to obtain a new exclusively owned object if necessary. In this way, one can lift the checks in loop out of the body, leaving a clean code path for further optimization opportunities. What's more, calling between "colored" and "uncolored" functions do not require explicit users' efforts.
 
 Together with the discussion in @interpolation, our framework supports three sorts of references together with the memory reuse token. Their conversions are detailed in @reference-diagram.
 
 #let ref-diagram = { 
-  let RC = (0, -1)
+  let Rc = (0, -1)
   let Unique = (0, 1)
   let Ref = (1, 0)
   let Token = (-1, 0)
   fletcher.diagram(
     node-stroke: 1pt,
     edge-stroke: 1pt,
-    node(RC, "Rc<T>"),
+    node(Rc, "Rc<T>"),
     node(Unique, "Unique<T>"),
     node(Ref, "&T"),
     node(Token, "Token<T>"),
-    edge(Unique, RC, "<|-", [uniquefy], label-pos: 0.9),
-    edge(Unique, RC, "-|>", [direct cast], label-pos: 0.1),
-    edge(RC, Ref, "-|>", bend: 30deg, [borrow]),
+    edge(Unique, Rc, "<|-", [uniquefy], label-pos: 0.9),
+    edge(Unique, Rc, "-|>", [direct cast], label-pos: 0.1),
+    edge(Rc, Ref, "-|>", bend: 30deg, [borrow]),
     edge(Unique, Ref, "-|>", bend: -30deg, [borrow]),
-    edge(Token, RC, "-|>", bend: 30deg, [reuse], label-pos: 0.1),
-    edge(RC, Token, "-|>", bend: 30deg, [drop], label-pos: 0.7),
+    edge(Token, Rc, "-|>", bend: 30deg, [reuse], label-pos: 0.1),
+    edge(Rc, Token, "-|>", bend: 30deg, [drop], label-pos: 0.7),
     edge(Token, Unique, "-|>", bend: -30deg, [reuse], label-pos: 0.1),
     edge(Unique, Token, "-|>", bend: -30deg, [drop], label-pos: 0.7),
   )
@@ -356,7 +382,7 @@ Together with the discussion in @interpolation, our framework supports three sor
   caption: [Reference Sorts]
 ) <reference-diagram>
 
-- `Rc<T>` is the traditional RC pointer to a managed object.
+- `Rc<T>` is the traditional Rc pointer to a managed object.
 - `Unique<T>` can only be used in function parameters (not materializable as object fields). It is used to denote the exclusivity statically as discussed above. A possible runtime implementation is to add a wrapper to the `Rc<T>` with compiler instrinsics hinting the exclusivity (such as `llvm.assume` and `llvm.unreachable`).  
 - `&T` represents a borrowed reference to the object. As mentioned in @interpolation, such borrowed references can be used in FFI. When compiling to Rust, the reference is translated as a reference to the underlying value inside the `Rc` managed area. This setting automatically makes sure that safe FFI cannot manipulate the reference counting of the memory object, avoiding interference to the reuse analysis. 
 - `Token<T>` is the memory reuse token. The type parameter is needed to carry layout information, as needed in @open-type.
@@ -475,7 +501,7 @@ For types with similar shapes, the analysis pass cannot direcly decide reusabili
 
 == Memory Reuse Fusion and Specialization
 
-Another complication for RC-based high-level memory reuse runtime arises from abstraction of RC pointers. We have illustrated that both Koka and Lean make memory reuse possible by internalizing RC operations as intrinsics in IR. In our framework, we also use such intrinsics in IR. When lowering into Rust, however, to achieve seamless interpolation as promised in @interpolation, managed objects are simply materialized as normal language objects (`Rc<T>`). 
+Another complication for Rc-based high-level memory reuse runtime arises from abstraction of Rc pointers. We have illustrated that both Koka and Lean make memory reuse possible by internalizing Rc operations as intrinsics in IR. In our framework, we also use such intrinsics in IR. When lowering into Rust, however, to achieve seamless interpolation as promised in @interpolation, managed objects are simply materialized as normal language objects (`Rc<T>`). 
 
 We want to highlight that by providing enough facilities around `Rc<T>`, one can embed the memory reuse operations into the host language. For instance, when mutate imperative data structures, `Rc::make_mut()` is used to garantee exclusive access to objects. Besides, one can also utilize `drop()`, `clone()` provided by Rust itself, together with `drop_for_reuse()`, `Rc::reuse_or_alloc()` provided by our framework to achieve memory management.
 
@@ -497,7 +523,7 @@ List::Cons(ref y, ref ys) => {
 ```
 The fusion step will push down the `clone()` operations and cancel them with `drop()` on the fast path. However, this is not direcly approachable in rust, since later on, when constructing `List::Cons(y, acc)`, we still need to value bounded to `y`. There is no easy way to remove extra cost due to `clone()`.
 
-Fortunately, Rust provides `Rc::unwrap()` operation. Addtionally, we can provides `Rc::unwrap_for_reuse()`. With exclusive access, such functions simply move the values out of the RC-managed memory area and generate reuse tokens. Otherwise, they clone the values. In either way, one will get a value rather than RC reference for the underlying object.
+Fortunately, Rust provides `Rc::unwrap()` operation. Addtionally, we can provides `Rc::unwrap_for_reuse()`. With exclusive access, such functions simply move the values out of the Rc-managed memory area and generate reuse tokens. Otherwise, they clone the values. In either way, one will get a value rather than Rc reference for the underlying object.
 
 ```rust
 List::Cons(..) => {
@@ -521,7 +547,7 @@ In general settings, the CFG can be much more complicated. One way to proceed is
 
 Reuse analysis resembles CFA in the sense that a drop operating creates an available memory token. Such tokens are carried in context until being consumed at an allocation site. 
 
-The dataflow formulation is interesting as it can extend our proposed framework to support imperative programming languages where RC objects are internalized in IR.
+The dataflow formulation is interesting for future research as it can extend our proposed framework to support imperative programming languages where Rc objects are internalized in IR.
 
 == Optimal Pairing for Memory Reuse 
 
@@ -535,15 +561,39 @@ Memory reuse is an optimistic optimization that speeds up the fast path. Without
 
 == GC Integration
 
-RC-based memory management policy suffers from cyclic reference problem, where objects organized in cycles are permanently leaked. It is not a problem for purely functional programming languages with only (co-)inductively defined data types. However, special local and global mutable reference are also widely adopted in various functional languages, that can potentially lead to cycles.
+Rc-based memory management policy suffers from cyclic reference problem, where objects organized in cycles are permanently leaked. It is not a problem for purely functional programming languages with only (co-)inductively defined data types. However, special local and global mutable reference are also widely adopted in various functional languages, that can potentially lead to cycles.
 
-The sites that possibly form cycles can be identified with careful design. However, it remains an open problem to find good choices for handling cycles. When using functional programming for concurrency, purely RC-based approach may not be desirable due to considerable overhead from atomic operations. All these issues suggest that one might investigate integrating GC and RC together and conditonally switching between them. Some pioneering works are done in @NIM @ORCA. 
+The sites that possibly form cycles can be identified with careful design. However, it remains an open problem to find good choices for handling cycles. When using functional programming for concurrency, purely Rc-based approach may not be desirable due to considerable overhead from atomic operations. All these issues suggest that one might investigate integrating GC and Rc together and conditonally switching between them. Some pioneering works are done in @NIM @ORCA. 
 
-RC has already been heavily employed in modern garbage collectors, as in @lxr @rc-immix. These approaches usually utilize very small referece counters and once an object is upgraded to GC management due to overflow, the ownership and exclusivity information is permanently lost. Thus, a proper way to preserve information for memory reuse remains to be discovered.
+Rc has already been heavily employed in modern garbage collectors, as in @lxr @rc-immix. These approaches usually utilize very small referece counters and once an object is upgraded to GC management due to overflow, the ownership and exclusivity information is permanently lost. Thus, a proper way to preserve information for memory reuse remains to be discovered.
+
+== Value Sharing Problem
+
+Consider the following code in Koka:
+#text(size: 10pt)[
+```js 
+fun subst(t : tree<a>, x : int, y: int) : tree<a>
+  match t 
+    Node(l, v, r) ->
+      if v == x then Node(subst(l, x, y), y, subst(l, x, y))
+                else Node(subst(l, x, y), v, subst(l, x, y))
+    Leaf -> t
+```
+]
+
+When substituting an non-exist value, `subst` is actually a fixed-point operation. Ideally, no allocation should happen since the tree should no be changed at all. Indeed, if the tree is uniquely owned, the reuse analysis will effectively doing inplace updates that end up doing nothing. However, if the tree is shared, extra allocation is unavoidable with only reuse analysis.
+
+A possible solution is as the following:
+
+1. Apply interprocedual analysis to mark functions that potentially acts as a fixed point with repect to its input arguments.
+
+2. When returning from such function and constructing a value that potentially "overlaps" with the original value, check the addresses of return values. If addresses stay the same, propogate the value sharing by return the original object.
+
+With memory reuse, such process is actually problematic, as inplace updates will give back the same addresses with distinct values. However, it is possible to apply value sharing optimization on slow paths where we know target value is shared and no inplace updates is possible. Another complication is tail-call optimization as it changes the convention of argument passing. Therefore, one should design a cost model carefully to decide value sharing strategies.
 
 = Conclusion
 
 
-We have delved into the essence of memory reuse by examining the fundamental rules that underpin computations in functional programming. Bearing this essence in mind, this work introduces a novel approach that compiles RC-based memory reuse from guest languages to high-level languages, such as Rust, with an emphasis on robustness and efficiency. Throughout our design process, we encountered several challenges, including the avoidance of type erasure, navigating the move semantics of the host language, compiling with higher-order abstract syntax (HOAS), handling interpolation, ensuring uniqueness typing, addressing open type problems, and implementing specializations with reuse fusion.
+We have delved into the essence of memory reuse by examining the fundamental rules that underpin computations in functional programming. Bearing this essence in mind, this work introduces a novel approach that compiles Rc-based memory reuse from guest languages to high-level languages, such as Rust, with an emphasis on robustness and efficiency. Throughout our design process, we encountered several challenges, including the avoidance of type erasure, navigating the move semantics of the host language, compiling with higher-order abstract syntax (HOAS), handling interpolation, ensuring uniqueness typing, addressing open type problems, and implementing specializations with reuse fusion.
 
-Additionally, we have identified open problems related to dataflow cost modeling and the integration of garbage collection (GC) mechanisms. As proof assistants and other related applications continue to evolve, the demand for increasingly sophisticated functional programming capabilities grows. We believe that our framework holds significant value for both the academic and industrial sectors, offering a potent tool for enhancing the efficiency and effectiveness of functional programming languages in managing memory reuse.
+Additionally, we have identified open problems related to dataflow cost modeling, the integration of garbage collection (GC) mechanisms and the value sharing problem. As proof assistants and other related applications continue to evolve, the demand for increasingly sophisticated functional programming capabilities grows. We believe that our framework holds significant value for both the academic and industrial sectors, offering a potent tool for enhancing the efficiency and effectiveness of functional programming languages in managing memory reuse.

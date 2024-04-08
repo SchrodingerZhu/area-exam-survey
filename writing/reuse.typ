@@ -12,7 +12,7 @@ In the userspace of modern Unix-like operating systems, memory is typically obta
 
 To counteract these issues, userspace memory is generally managed by memory allocators, acting as a sort of cache for pages between the operating system and userspace allocations. Upon allocation, rather than directly invoking mmap, allocators opt to utilize available space in their cached pages. Conversely, upon deallocation, instead of immediately returning the page to the OS, the allocator postpones the page's release by initially placing it into the cache pool. This practice represents a lower-level form of memory reuse, aiming to repurpose available page space from previous deallocations in the hope that subsequent allocations will reuse this memory space.
 
-Memory allocators, like those incorporated by libc, are often accessed by multiple threads, necessitating the global page pool to be safeguarded by mutexes or other synchronization mechanisms, thereby imposing additional costs on malloc/free operations. To circumvent this overhead, modern allocators such as mimalloc, referenced in @leijen2019mimalloc, and snmalloc, noted in @snmalloc, have introduced a concept known as freelist sharding. This approach involves segregating the page pool by different size classes, with available memory blocks being placed into local freelists initially and only transferred back to the global pool once certain conditions are met. This strategy adds an additional layer of memory reuse by considering the local context, where consecutive allocations and deallocations are capured by frequent addition and removal of memory objects from local lists, thereby achieving higher throughput.
+Memory allocators, like those incorporated by libc, are often accessed by multiple threads, necessitating the global page pool to be safeguarded by mutexes or other synchronization mechanisms, thereby imposing additional costs on malloc/free operations. To circumvent this overhead, modern allocators such as mimalloc @leijen2019mimalloc, and snmalloc @snmalloc, have introduced a concept known as freelist sharding. This approach involves segregating the page pool by different size classes, with available memory blocks being placed into local freelists initially and only transferred back to the global pool once certain conditions are met. This strategy adds an additional layer of memory reuse by considering the local context, where consecutive allocations and deallocations are capured by frequent addition and removal of memory objects from local lists, thereby achieving higher throughput.
 
 Especially for small allocations on the fast path, where an allocation finds a match in local freelists, the operation is exceptionally efficient; for instance, in snmalloc, there are only about 45 general instructions with just two branches, significantly fewer than what is required for the cold initialization routine.
 
@@ -64,9 +64,9 @@ However, due to the batched nature of garbage collection, memory reuse is genera
 1. Imperative data structures are usually modified in place, as opposed to being completely recreated, thus avoiding the cycle of elimination and introduction inherent in functional structures.
 2. Deallocations in imperative programming are more explicit and precise, leading to potentially more efficient memory use.
 
-To approach the functional equivalent of these characteristics, beyond efficient reclamation, one also needs to ensure the uniqueness (or exclusivity) of managed objects. Here, RC-based (Reference Counting) strategies excel, as recent works in @perceus, @frame-limited, and @fp2 have started to establish a comprehensive set of RC-based reuse analysis and optimizations.
+To approach the functional equivalent of these characteristics, beyond efficient reclamation, one also needs to ensure the uniqueness (or exclusivity) of managed objects. Here, Rc-based (Reference Counting) strategies excel, as recent works in @perceus, @frame-limited, and @fp2 have started to establish a comprehensive set of Rc-based reuse analysis and optimizations.
 
-Compared to complex GC runtimes, RC is simpler and more straightforward. For example, the inductively defined integer list reversing function can be translated into Rust using `Rc` in a standard manner as illustrated:
+Compared to complex GC runtimes, Rc is simpler and more straightforward. For example, the inductively defined integer list reversing function can be translated into Rust using `Rc` in a standard manner as illustrated:
 
 #text(size: 12pt)[
 ```rs
@@ -130,7 +130,7 @@ pub fn reverse(xs: Rc<List>, acc: Rc<List>) -> Rc<List> {
 ```
 ]
 
-As an optimization, the `clone()` operations could be moved inside the `Rc::is_unique` branch to pair with the `drop()` operations, eliminating unnecessary cloning when the Rc is unique. This modification leads to a cleaner and more efficient path for direct memory reuse:
+As an optimization, the `clone()` operations could be moved inside the `Rc::is_unique()` branch to pair with the `drop()` operations, eliminating unnecessary cloning when the Rc is unique. This modification leads to a cleaner and more efficient path for direct memory reuse:
 
 #text(size: 12pt)[
 ```rs
@@ -174,7 +174,7 @@ pub fn foo(bar: Rc<List>, baz: bool) -> Rc<List> {
 ```
 ]
 
-Inserting the `drop()` operation immediately after pattern destruction is not always feasible, particularly when the variable in question is utilized within a nested branch. A viable workaround is to defer the `drop()` to subsequent layers of the program. This kind of code transformation can be systematically executed, a process that will be elaborated on in the context of "drop-guided" release analysis, as discussed in @frame-limited. Before delving into that discussion, let's examine another motivating example to further illustrate the concept.
+Inserting the `drop()` operation immediately after pattern destruction is not always feasible, particularly when the variable in question is utilized within a nested branch. A viable workaround is to defer the `drop()` to subsequent layers of the program. This kind of code transformation can be systematically executed, a process that will be elaborated as "drop-guided" reuse analysis, as discussed in @frame-limited. Before delving into that discussion, let's examine another motivating example to further illustrate the concept.
 
 #text(size: 12pt)[
 ```rs 
@@ -198,9 +198,9 @@ let token = drop_with_memory(bar);
 Rc::reuse_or_alloc(token, Cons(qux, Nil))
 ``` 
 ] 
-While this code captures the reuse opportunity, it introduces another problem. That is, even though the memory associated with `bar` may have already become available for reuse before calling `quux`, it is not released during the entire execution of `quux`. In the worst-case scenario, this could result in a continuous increase in heap usage, especially if quux is a long-running operation or if similar patterns are prevalent throughout the codebase, leading to inefficient memory utilization.
+While this code captures the reuse opportunity, it introduces another problem. That is, even though the memory associated with `bar` may have already become available for reuse before calling `quux`, it is not released during the entire execution of `quux`. In the worst-case scenario, this could result in a continuous increase in heap usage, especially if quux is a recursion or if similar patterns are prevalent throughout the codebase, leading to inefficient memory utilization.
 
-@frame-limited believes that problems mentioned above fundamentally stem from a disregard for liveness in reuse analysis. The reuse analysis pass already acquire essential information of the liveness of objects. Hence, the reuse decisions  decisions should be more closely aligned with this liveness data. As shown in @analysis-flow, the proposed algorithm leverages liveness information to pinpoint the frontier where a managed object is used for the last time. Drops are inserted to such sites. In this way, if the ownership of an object is passed to another function, neither `drop()` nor `clone()` will be added, avoiding the problem in `quux(bar.clone())`. To achieve memory reuse, a `drop()` in this case, will always generate a reuse token carried by the context. Going along the control flow, if there is an allocation that is feasible to reuse memory resource carried within the context, the reuse token will be assigned to the allocation. Conversely, if there is no possible memory reuse, an additional `free()` operation will be inserted to clean up any surplus tokens.
+@frame-limited believes that problems mentioned above fundamentally stem from a disregard for liveness in reuse analysis. The reuse analysis pass already acquire essential information of objects' liveness. Hence, the reuse decisions should be more closely aligned with the live range of objects. As shown in @analysis-flow, the proposed algorithm leverages liveness information to pinpoint the frontier where a managed object is used for the last time. Drops are inserted to such sites. In this way, if the ownership of an object is passed to another function, neither `drop()` nor `clone()` will be added, avoiding the problem in `quux(bar.clone())`. To achieve memory reuse, a `drop()` in this case, will always generate a reuse token carried by the context. Going along the control flow, if there is an allocation that is feasible to reuse memory resource carried within the context, the reuse token will be assigned to the allocation. Conversely, if there is no possible memory reuse, an additional `free()` operation will be inserted to clean up any surplus tokens.
 
 #let analysis-flow = { 
 import fletcher.shapes: diamond
