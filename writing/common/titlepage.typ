@@ -51,7 +51,7 @@
       columns: 2,
       gutter: 1em,
       strong("Author: "), author,
-      strong("Advisor: "), advisor,
+      strong("Academic Advisor: "), advisor,
       strong("Submission Date: "), submissionDate,
     )
   )
