@@ -105,7 +105,7 @@ This code motion has several benefits. One a memory cell is no longer referenced
 
 Unfortunately, such code motions also incur substantial costs.
 1. In Rust (and C++), `Rc` are usually constructed with the hope that it may be shared at various sites. Hence, its deallocation is annotated as a cold path, potentially confusing the branch prediction;
-2. Even though the memory reuse is possible, the calls to allocations and deallocations may not be easily canceled. C++ does permit cancellation of `new` and `delete` pairs, but the compiler support is rather restrictive;
+2. Even though the memory reuse is possible, the calls to allocations and deallocations may not be easily elided. Modern C++ does permit replacement and cancellation of `new` and `delete` pairs, but the compiler support is rather restrictive @cpp;
 3. Meanwhile, such code always projects out subfields via clone operations no matter the memory reuse is feasible or not (or, whether the `Rc` is holding the exclusive reference to the object). In the case of exclusive access, there is no need to do `clone` followed by `drop` for subfields.
 
 To mitigate these issues, one can inline the destructors associated with the `List`. To make sure the memory cell is reused immediately, we also explicitly express the passing of memory. Although the following Rust code is conceptual and not directly admissible by standard Rust compilers, it serves to illustrate the underlying idea:

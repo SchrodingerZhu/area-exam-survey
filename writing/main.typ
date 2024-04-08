@@ -327,22 +327,28 @@ A straightforward solution is to have uniqueness in type system @Uniqueness @Lin
 
 We propose a more friendly approach to incorporate static uniqueness into our runtime. We also assume that users are capable of specifying uniqueness requirements in performance critial routines. Notice that, our RC-based runtime provides two operations: (1) checking the exclusivity of a RC reference, and (2) obtaining shallow copies of a managed object. These two operations enable easy transitions between "colored" and "uncolored" functions. Upon calling a function that demands uniqueness, the compiler inserts a check on the uniqueness of the objects and use shallow copy to obtain a new exclusively owned object if necessary. In this way, one can lift the checks in loop out of the body, leaving a clean code path for further optimization opportunities. What's more, calling between "colored" and "uncolored" functions do not require explicit users' efforts.
 
-Together with the discussion in @interpolation, our framework supports three sorts of references. Their conversions are detailed in @reference-diagram.
+Together with the discussion in @interpolation, our framework supports three sorts of references together with the memory reuse token. Their conversions are detailed in @reference-diagram.
 
 #let ref-diagram = { 
-  let RC = (-1, -1)
-  let Unique = (-1, 1)
+  let RC = (0, -1)
+  let Unique = (0, 1)
   let Ref = (1, 0)
+  let Token = (-1, 0)
   fletcher.diagram(
     node-stroke: 1pt,
     edge-stroke: 1pt,
     node(RC, "Rc<T>"),
     node(Unique, "Unique<T>"),
     node(Ref, "&T"),
-    edge(RC, Unique, "-|>", [uniquefy], label-pos: 0.1),
+    node(Token, "Token<T>"),
+    edge(Unique, RC, "<|-", [uniquefy], label-pos: 0.9),
     edge(Unique, RC, "-|>", [direct cast], label-pos: 0.1),
     edge(RC, Ref, "-|>", bend: 30deg, [borrow]),
     edge(Unique, Ref, "-|>", bend: -30deg, [borrow]),
+    edge(Token, RC, "-|>", bend: 30deg, [reuse], label-pos: 0.1),
+    edge(RC, Token, "-|>", bend: 30deg, [drop], label-pos: 0.7),
+    edge(Token, Unique, "-|>", bend: -30deg, [reuse], label-pos: 0.1),
+    edge(Unique, Token, "-|>", bend: -30deg, [drop], label-pos: 0.7),
   )
 }
 #figure(
@@ -353,6 +359,7 @@ Together with the discussion in @interpolation, our framework supports three sor
 - `Rc<T>` is the traditional RC pointer to a managed object.
 - `Unique<T>` can only be used in function parameters (not materializable as object fields). It is used to denote the exclusivity statically as discussed above. A possible runtime implementation is to add a wrapper to the `Rc<T>` with compiler instrinsics hinting the exclusivity (such as `llvm.assume` and `llvm.unreachable`).  
 - `&T` represents a borrowed reference to the object. As mentioned in @interpolation, such borrowed references can be used in FFI. When compiling to Rust, the reference is translated as a reference to the underlying value inside the `Rc` managed area. This setting automatically makes sure that safe FFI cannot manipulate the reference counting of the memory object, avoiding interference to the reuse analysis. 
+- `Token<T>` is the memory reuse token. The type parameter is needed to carry layout information, as needed in @open-type.
 
 == Open Type Parameters <open-type>
 
