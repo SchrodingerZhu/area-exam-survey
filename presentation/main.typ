@@ -64,27 +64,134 @@ Many language researchers favor functional programming:
 
 - Primitive Types
   - Int
-  - Chat/String
+  - Char/String
   - Unit 
-- Inductive Construction
+- Inductive Construction (Sum/Product)
   ```lean
   inductive List (A : Type)
     | Nil
-    | Cons A List
+    | Cons A (List A)
   ```
-== Inductive Types
+
+#pagebreak()
 
 
-#let rule = curryst.rule(
+#let formation = curryst.proof-tree(curryst.rule(
   label: [],
   [$"List" A "type"$],
   [$A "type"$],
-)
-#let tree = curryst.proof-tree(rule)
+))
 
 - Type Formation Rule
 $
-tree
+formation
 $
 
+#let intro1 = curryst.proof-tree(curryst.rule(
+  label: [],
+  [$"Nil : List A"$],
+  [$" "$],
+))
 
+#let intro2 = curryst.proof-tree(curryst.rule(
+  label: [],
+  [$"Cons"(x, y) : "List" A$],
+  [$x : A$],
+  [$y : "List" A$]
+))
+
+- Introduction Rules
+$
+intro1
+intro2
+$
+
+#let elimination = curryst.proof-tree(curryst.rule(
+  label: [],
+  [$"Elim"_"List A" (ell, square_"Nil", f_"Cons") : B$ ],
+  [$ell  : A$],
+  [$square_"Nil" : star ->B $],
+  [$f_"Cons" : A times "List" A -> B$]
+))
+
+- Elimination Rule (Non-Dependent Version, $beta$-rule)
+$
+elimination
+$
+
+#pagebreak()
+
+- Conversion Rules ($eta$-rules)
+
+#let conv1 = curryst.proof-tree(curryst.rule(
+  label: [],
+  [$"Elim"_"List A" ("Nil", square_"Nil", f_"Cons") equiv  square_"Nil" (star) : B$ ],
+  [$square_"Nil" : star ->B $],
+  [$f_"Cons" : A times "List" A -> B$]
+))
+
+#let conv2 = curryst.proof-tree(curryst.rule(
+  label: [],
+  [$"Elim"_"List A" ("Cons"(x, y), square_"Nil", f_"Cons") equiv  f_"Cons" (x, y) : B$ ],
+  [$square_"Nil" : star -> B $],
+  [$f_"Cons" : A times "List" A -> B$],
+  [$x : A$],
+  [$y : "List" A$],
+))
+
+$
+conv1 \
+conv2
+$
+
+== Computation as Introductions and Eliminations
+=== Redblack Tree 
+
+#text(size: 19pt)[
+```haskell
+balance B (Node R (Node R a x b) y c) z d = Node R (Node B a x b) y (Node B c z d)
+balance B (Node R a x (Node R b y c)) z d = Node R (Node B a x b) y (Node B c z d)
+balance B a x (Node R b y (Node R c z d)) = Node R (Node B a x b) y (Node B c z d)
+balance B a x (Node R (Node R b y c) z d) = Node R (Node B a x b) y (Node B c z d)
+balance color l k r = Node color l k r
+```
+]
+
+=== NbPE
+
+$
+TT &: "Term Domain"\
+VV &: "Value Domain" \
+lr(bracket.l.double dot.c bracket.r.double) &: TT -> VV \
+"eval" &: VV -> VV \
+"reify" &: VV -> TT \
+"NbPE" &: TT -> TT \
+"NbPE" &= "reify" compose "eval" compose lr(bracket.l.double dot.c bracket.r.double) 
+$
+
+#pagebreak()
+
+```hs   
+eval :: Env -> Tm -> Val
+eval env = \case
+  Var x     -> fromJust $ lookup x env
+  App t u   -> eval env t $$ eval env u
+  Lam x t   -> VLam x (\u -> eval ((x, u):env) t)
+  Let x t u -> eval ((x, eval env t):env) u
+
+quote :: [Name] -> Val -> Tm
+quote ns = \case
+  VVar x                 -> Var x
+  VApp t u               -> App (quote ns t) (quote ns u)
+  VLam (fresh ns -> x) t -> Lam x (quote (x:ns) (t (VVar x)))
+```
+
+== Takeaways
+
+- Introductions, Eliminations and Eta-conversions encode the computation of function programming.
+
+- These rules are closely related to pattern matchings and core language (IR) transformations.
+
+- Efficiently handling of introductions and eliminations is a key factor to performance.
+
+= Reuse Analysis
