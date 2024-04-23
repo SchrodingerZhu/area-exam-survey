@@ -60,6 +60,38 @@ Many language researchers favor functional programming:
 2. GADT/Functor abstractions (First-class modules)
 4. (Addtionally) Good garbage collection for nontrivial memory patterns
 
+#pagebreak()
+
+#text(size: 12pt)[
+```
+[4399/4429] Building Mathlib.Probability.Independence.ZeroOne
+[4403/4429] Building Mathlib.Analysis.SpecialFunctions.Gamma.Deligne
+[4404/4429] Building Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation
+[4404/4429] Building Mathlib.Analysis.Fourier.Inversion
+[4406/4429] Building Mathlib.NumberTheory.NumberField.CanonicalEmbedding.ConvexBody
+[4407/4429] Building Mathlib.NumberTheory.ModularForms.JacobiTheta.TwoVariable
+[4409/4429] Building Mathlib.NumberTheory.LSeries.MellinEqDirichlet
+[4410/4429] Building Mathlib.Analysis.MellinInversion
+[4413/4429] Building Mathlib.NumberTheory.ModularForms.JacobiTheta.Bounds
+[4413/4429] Building Mathlib.NumberTheory.ModularForms.JacobiTheta.OneVariable
+[4414/4429] Building Mathlib.NumberTheory.ModularForms.JacobiTheta.Manifold
+[4414/4429] Building Mathlib.NumberTheory.ZetaFunction
+[4416/4429] Building Mathlib.NumberTheory.LSeries.HurwitzZetaEven
+[4418/4429] Building Mathlib.NumberTheory.NumberField.Discriminant
+[4418/4429] Building Mathlib.NumberTheory.NumberField.Units
+[4419/4429] Building Mathlib.NumberTheory.LSeries.Dirichlet
+[4419/4429] Building Mathlib.NumberTheory.EulerProduct.DirichletLSeries
+[4419/4429] Building Mathlib.NumberTheory.Harmonic.ZetaAsymp
+[4424/4429] Building Mathlib.NumberTheory.Cyclotomic.Discriminant
+[4424/4429] Building Mathlib.NumberTheory.NumberField.ClassNumber
+[4425/4429] Building Mathlib.NumberTheory.Cyclotomic.Rat
+[4427/4429] Building Mathlib.NumberTheory.Cyclotomic.PID
+[4428/4429] Building Mathlib
+18895.18user 900.24system 18:24.06elapsed 1792%CPU (0avgtext+0avgdata 2392648maxresident)k
+222728347inputs+6915077outputs (446465major+109070444minor)pagefaults 0swaps
+```
+]
+
 = Functional Programming Patterns
 
 == Inductive Types
@@ -116,15 +148,14 @@ $
   [$f_"Cons" : A times "List" A -> B$]
 ))
 
-- Elimination Rule (Non-Dependent Version, $beta$-rule)
+- Elimination Rule (Non-Dependent Version)
 $
 elimination
 $
 
 #pagebreak()
 
-- Conversion Rules ($eta$-rules)
-
+- Computation Rules
 #let conv1 = curryst.proof-tree(curryst.rule(
   label: [],
   [$"Elim"_"List A" ("Nil", square_"Nil", f_"Cons") equiv  square_"Nil" (star) : B$ ],
@@ -190,7 +221,7 @@ quote ns = \case
 
 == Takeaways
 
-- Introductions, Eliminations and Eta-conversions encode the computation of function programming.
+- Computation of function programming are associated with introductions and eliminations.
 
 - These rules are closely related to pattern matchings and core language (IR) transformations.
 
