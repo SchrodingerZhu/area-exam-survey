@@ -779,8 +779,87 @@ url = {https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/n4950.pdf},
 year = {2023},
 }
 
+@inproceedings{state-monad,
+author = {Jones, Mark P.},
+title = {Functional Programming with Overloading and Higher-Order Polymorphism},
+year = {1995},
+isbn = {3540594515},
+publisher = {Springer-Verlag},
+address = {Berlin, Heidelberg},
+booktitle = {Advanced Functional Programming, First International Spring School on Advanced Functional Programming Techniques-Tutorial Text},
+pages = {97–136},
+numpages = {40}
+}
 
-  
+@misc{mtl,
+author = {MTL Authors},
+title = {mtl: Monad classes for transformers, using functional dependencies},
+year = {2024},
+url = {https://hackage.haskell.org/package/mtl},
+}
+
+@misc{flt,
+author = {FLT-regular Working Group},
+title = {Fermat's Last Theorem for regular primes},
+year = {2024},
+url = {https://github.com/leanprover-community/flt-regular},
+}
+
+@misc{mathlib4,
+author = {The Lean Community},
+title = {mathlib4: The math library of Lean 4},
+year = {2024},
+url = {https://leanprover-community.github.io/mathlib4_docs/},
+}
+
+@misc{agda,
+author = {The Agda Community},
+title = {What is Agda?},
+year = {2024},
+url = {https://agda.readthedocs.io/en/latest/getting-started/what-is-agda.html},
+}
+
+@inproceedings{aggregate-problem,
+author = {Hudak, Paul and Bloss, Adrienne},
+title = {The aggregate update problem in functional programming systems},
+year = {1985},
+isbn = {0897911474},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/318593.318660},
+doi = {10.1145/318593.318660},
+abstract = {We discuss the problem of efficiently implementing aggregates (contiguous data structures) such as arrays in functional programming systems. Simple changes to an aggregate conceptually involve making a new copy of the aggregate differing only in the changed component, but such copying can be expensive. We present both static and dynamic techniques for avoiding this copying, and argue that they allow one to program functionally using aggregates, without loss of efficiency over conventional programs.1},
+booktitle = {Proceedings of the 12th ACM SIGACT-SIGPLAN Symposium on Principles of Programming Languages},
+pages = {300–314},
+numpages = {15},
+location = {New Orleans, Louisiana, USA},
+series = {POPL '85}
+}
+
+@misc{scala-pr,
+author = {Zeiger, Stefan},
+title = {Rewrite Vector (now "radix-balanced finger tree vectors"), for performance},
+url = {https://github.com/scala/scala/pull/8534},
+year = {2019}
+}
+
+@inproceedings{rrb-vector,
+author = {Stucki, Nicolas and Rompf, Tiark and Ureche, Vlad and Bagwell, Phil},
+title = {RRB vector: a practical general purpose immutable sequence},
+year = {2015},
+isbn = {9781450336697},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/2784731.2784739},
+doi = {10.1145/2784731.2784739},
+abstract = {State-of-the-art immutable collections have wildly differing performance characteristics across their operations, often forcing programmers to choose different collection implementations for each task. Thus, changes to the program can invalidate the choice of collections, making code evolution costly. It would be desirable to have a collection that performs well for a broad range of operations. To this end, we present the RRB-Vector, an immutable sequence collection that offers good performance across a large number of sequential and parallel operations. The underlying innovations are: (1) the Relaxed-Radix-Balanced (RRB) tree structure, which allows efficient structural reorganization, and (2) an optimization that exploits spatio-temporal locality on the RRB data structure in order to offset the cost of traversing the tree. In our benchmarks, the RRB-Vector speedup for parallel operations is lower bounded by 7x when executing on 4 CPUs of 8 cores each. The performance for discrete operations, such as appending on either end, or updating and removing elements, is consistently good and compares favorably to the most important immutable sequence collections in the literature and in use today. The memory footprint of RRB-Vector is on par with arrays and an order of magnitude less than competing collections.},
+booktitle = {Proceedings of the 20th ACM SIGPLAN International Conference on Functional Programming},
+pages = {342–354},
+numpages = {13},
+keywords = {Arrays, Data Structures, Immutable, Radix-Balanced, Relaxed-Radix-Balanced, Sequences, Trees, Vectors},
+location = {Vancouver, BC, Canada},
+series = {ICFP 2015}
+}
 
 
 

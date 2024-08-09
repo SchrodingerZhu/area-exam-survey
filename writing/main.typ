@@ -37,56 +37,58 @@
 #set text(font: "EB Garamond")
 
 = Introduction
-In recent years, proof assistants have surged in popularity across both academic and industrial domains. Computer scientists begin to use proof assistants to verify realistic software systems as exemplified by @Leroy-Compcert-CACM @composable-verification. Simultaneously, mathematicians are beginning to seriously integrate computer-aided proofs into their workflows @terence_tao_lean_tour @Fermat_last_theorem. Such trend leads to serious considerations for the design and implementation of high-performance functional programming languages.
 
-An emerging challenge lies in efficiently managing memory resources for functional languages. Essentially, the memory management policy must address rapid allocations and deallocations to enhance memory reuse and locality. In a general context, global allocators strive to adapt to these patterns by establishing various levels of free lists, as discussed in @locality-alloc @leijen2019mimalloc @snmalloc. Functional programming, distinguished by its inherent immutability, requires even more frequent memory reuse to accommodate its specific needs.
+// TODO: enhance citation
+Functional programming, as its name suggests, allows users to compose their programs in a way that is similar to mathematical functions. The ability to present programs similar to mathematical expressions lies in the immutability nature of functional programming. Such programming paradigm has several advantages. For instance, immutability implies race free in the context of parallel programming. The simplied control flows and immutable assumptions of functional programs largely simplifies many advanced static analysis, optimizations and program verifications.
 
-Efficient memory management and locality optimization remain central to the evolution of modern programming languages and software development. The memory resources of functional languages are typically managed by garbage collectors. Depending on different user scenarios, various implementations may configure their collection algorithms with distinct characteristics, as evidenced by the diverse approaches in @haskell, @ocaml, @ocaml-pm, @erlang-1, and @erlang-2. Despite these differences, these advanced collection algorithms universally adopt generational approaches, underscoring the significance of locality and efficient memory reuse in frequently accessed (hot) regions. Recently developed languages like Koka and Lean 4 have illuminated the potential of combining Rc-based (Reference Counting) runtime and reuse analysis to achieve in-place mutability within a purely functional environment, as indicated by @lean-4 @perceus @frame-limited @fp2. Researchers have termed this innovative approach as the "functional-but-in-place" (FBIP) paradigm. 
+Despite its elegance, functional programming also has its downsides. Immutability appears to be a double-edged sword. Many data structures and algorithms are complicated to implement in functional paradigm. Some may even be impossible to maintain its original efficiency when written in purely functional style. Performance for general situations in functional languages may also be affected as it is no longer possible to apply inplace updates. Objects often need to frequently constructed or destroyed in whole even though a state change only touchs partial fields.
 
-This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new Rc-based methods. Furthermore, by proposing a high-level runtime in Rust, this work will suggest potential enhancements to address existing challenges in reuse analysis and the Rc-based runtime framework.
+This survery wants to explore proposed solutions to these problems. By studying exsiting works, we hope to answer two big questions regarding functional programming:
 
-= Functional Programming
-== A Brief Overview
+1. *Is it possible to achieve inplace mutability as in imperative programming while keeping the program in functional paradigm?* If this is possible, what efforts are needed for runtime and static analysis? Are such approaches in favor of certain functional design patterns?
+
+2. *Is it possible to interpolate between functional and imperative programming without breaking the immutable views of functional programs?* Does such interpolation require extra efforts from programmers?
+
+In order to answer these questions, we arrange the survery in the following structure:
+
+- @functional-programming will introduce some basic backgrounds of functional programming and common design patterns. We will be able to see when and why immutability are causing problems.
+
+- @early-story will summarize traditional methods to handle such immutability issues. This section mainly includes two aspects: 1) the definition of "large object" and "aggregate update" problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions in functional languages.
+
+- Section TODO continues on exploring the solutions but focusing on some newly developed methods based reuse analysis. This section will discuss runtime requirement and static analysis required by reuse analysis. Besides solving the inplace update problem, it also explains why reference-counting (RC) based reuse runtime enables a straightforward way to wrap imperative data structures into functional programs. Program patterns favored by reuse analysis will also be covered.
+
+- Section TODO summarizes prior methods and lists some remaining issues with these solutions. The survery will propose potential solutions and provide a detailed discussion on implementation difficulties.
+
+= Functional Programming <functional-programming>
+
 Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: for example, values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
 
-However, programming within an immutable framework requires a paradigm shift from traditional imperative programming. Data structures in functional languages are typically built inductively, following an algebraic approach @construction @Pfenning2018 @hottbook. A functional programming language might start with simple built-in types like natural numbers and boolean values, then construct new types as combinations or variations of existing ones. For instance, a `List` structure in Lean 4 could be defined as:
-```lean
-inductive List : Type :=
-  | Nil 
-  | Cons (hd : Nat) (tl : List)
-```
-Here, `List` represents a sum type of `Nil` and `Cons`, with `Cons` being a product type combining `Nat` and `List`.
+== State Transitions in Functional Programming
+Being immutable, however, functional paradigm has its negative implications to performance. Consider the State Monad implementation in Haskell from MTL @mtl @state-monad. Without the capability to mutate individual field, the state transition is achieved by constructing new state objects and passing it to the desired continuation (the lambda expression wrapped in `state` constructors). If the code were not properly optimized, each of such state transition is accompanied by deallocations of original state object, allocations of new state object, and necessary field data copying. This will lead to considerable performance impacts especially when such object are large enough. 
 
-Given this construction, it's important to note that operations on functional data structures can be defined as functions in the mathematical sense. Consider the following red-black tree in Haskell from @algoxy:
-```hs
-data Color = R | B | BB
-data RBTree = Empty | Node Color RBTree Int RBTree
-```
-Assume that tree is represented as tuples aliased as type $TT$, $phi$ is a function that rebalance doubly blacked nodes and $mu$ is a function that blackens a node. Within this structure, the deletion operation can be articulated in terms of mathematical functions. 
-$
-f &: ZZ times TT -> TT\
-f(x, t) &= 
-cases(
-  emptyset\, & t = emptyset,
-  phi(C, f(x, l), k, r)\, & t = (C, l, k, r) and x < k,
-  phi(C, l, k, f(x, r))\, & t = (C, l, k, r) and x > k,
-  r\, & t = (C, l, k, r) and x = k and l = emptyset and C != B,
-  mu(r)\, & t = (C, l, k, r) and x = k and l = emptyset and C = B,
-  l\, & t = (C, l, k, r) and x = k and r = emptyset and C != B,
-  mu(l)\, & t = (C, l, k, r) and x = k and r = emptyset and C = B,
-  phi(C, l, m, (f, min(r), r))\, &"otherwise"
-)
-$
+```haskell
+class Monad m => MonadState s m | m -> s where
+    -- | Return the state from the internals of the monad.
+    get :: m s
+    get = state (\s -> (s, s))
 
-== Introductions and Eliminations
+    -- | Replace the state inside the monad.
+    put :: s -> m ()
+    put s = state (\_ -> ((), s))
 
-In order to effectively reason about these inductively defined data structures (in the mathematical manner mentioned in the previous chapter), functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. As an interesting comparison, @Lafont1997InteractionC also mentioned that the fundamental laws of computation are commutation (where new combinations are created) and annihilation (where cells are eliminated). In the context of functional programming, introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
+    -- | Embed a simple state action into the monad.
+    state :: (s -> (a, s)) -> m a
+    state f = do
+      s <- get
+      let ~(a, s') = f s
+      put s'
+      return a
+``` <state-monad-code>
 
-The operations that manipulate these data structures rely heavily on the application of these rules. In the subsequent section, we will explore two additional case studies that illustrate these common patterns, which are extensively utilized in practical scenarios.
+== Functional Data Structures
 
-=== Red-black Tree Balancing
+Unfortunately, consecutive construction and destruction of objects is actually a common pattern of functional paradigm.
 
-The provided code from @algoxy demonstrates an operation on the red-black tree, specifically the rebalancing process following an insertion. This code transforms the tree's structure to preserve the invariants that red-black trees must maintain. Implemented in Haskell, this function employs a pattern-matching style:
 #text(9pt)[
 ```hs
 balance B (Node R (Node R a x b) y c) z d = Node R (Node B a x b) y (Node B c z d)
@@ -96,49 +98,224 @@ balance B a x (Node R (Node R b y c) z d) = Node R (Node B a x b) y (Node B c z 
 balance color l k r = Node color l k r
 ```
 ]
-In this function, the left-hand side applies pattern matching to deconstruct the tree nodes and checks if their configuration falls into one of the specified categories for rebalancing. The four cases listed address different possible states of imbalance caused by insertion. On the right-hand side, if a potential violation of the red-black tree properties is identified, a new node structure is constructed. This reconstruction uses the fields decomposed from the original nodes on the left-hand side, effectively rebalancing the tree and ensuring that it adheres to the necessary red-black properties. Indeed, as one may notice, this function heavily employs consecutive uses of elimination rules and introduction rules.
 
-=== Normalization of (Partial) Evaluation
+Consider the functional red-black tree insertion balance algorithm implemented by @algoxy. The implementation uses pattern matching syntax in Haskell. On the left-hand side, the functions check if the arguments conforming certain patterns. If a match is found, balanced nodes on the right-hand side are constructed as return values using matched values from left-hand side. Implicitly, such procedure indicate the arguments on the left-hand side can be destructed if there is no further reference to these values after execution. The right-hand nodes are newly constructed, hence demand allocations. One can imagine that the functional implementation may lead to much more performance penalty due to the "immutable nature" built in the paradigm.
 
-Another compelling example is found in the domain of dependent type checkers, which are fundamental to proof assistants. In a dependently typed system, the core language does not make a clear distinction between types and data. As a consequence, for type checking to be executed, proof assistants must (weakly) normalize the language terms @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory. A notable strategy to accomplish this is through Normalization by Elaboration (NbE), also known as Normalization by Partial Evaluation (NbPE) @normalization-by-evaluation @NbPE.
+== The Demands for Performance
 
-The basic idea behind NbPE is to devise a specific semantic interpretation, denoted as 
-$lr(bracket.l.double dot.c bracket.r.double)$, that can be efficiently evaluated in the host language. This is coupled with a quote (or reify) operation that converts an object from the semantic interpretation domain back into the language's terms. The interpretation and reification, in a pair, garantee that @NbPE-diagram commutes.
+Before we moving on, let's answer the following questions: 
+1. Why does the performance of functional languages matter? 
+2. To what extend does the immutability affects the overall efficiency?
+
+In order to answer these questions, let's conduct an experiment on the Lean4  @lean-4 proof assistant. Lean4 and other dependent-typed functional programming languages are attracting increasingly more interests along cryptography, certified compilation and mathematics community. Compiler researchers and cryptography researchers are using them to verify critial programs. Mathematicians are embedding proof assistants into their workflows to tackle some most challenging works such as formalizing proofs to the Fermat's Last Theorem for regular primes @flt.
+
+For proof assistants, their type systems are rather complicated, which usually requires bidirectional type checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and NbPE @NbPE techniques on a relatively large ruleset. Many proof assistants choose to boostrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
+
+`mathlib4` @mathlib4 is a community driven project to formalize as much as mathematics with Lean4. As the project grows bigger and bigger, compilation (dominated by type checking mathematical theorems) time becomes increasingly concerning. There are $4886$ targets inside the project up to the time of access. Due to the long time of compilation, Lean4 community has to distribute "elaberated" #footnote("To check type equivalence, expressions are elaborated into certain normal forms via NbPE. Such an algorithm works like an interpreter that translates lambda terms into a semantic domain, evaluates it in such domain and converts them back to concrete lambda terms. The process manipulates a large amount of AST nodes in two different domains.") cache files to skip over some most time-consuming parts inside the compilation pipeline.
+
+We evaluate the time of full `mathlib4` compilation (not using any cache) with and without small allocators. Lean4 is using some advanced techiniques to mitigate performance penalty due to immutability. Small allocators one of its means to reduce the cost due to frequent allocations (which reflects the impact of immutability) by caching small memory blocks aggressively. We will make a more detailed discussion in upcomming sections. For now, the important take away is that the difference in compilation time can reflect the extend to which allocations are affecting the performance of functional programs. The device we used in Surface Pro 11 with 12 Qualcomm X Elite AArch64 cores. It is of a high-end profile for daily works. We allow the Lean4 compiler to utilize all 12 cores to parallel the process.
+
+#let profiling = {
+  set align(center)
+  set table(
+    stroke: none,
+    gutter: 0.2em,
+    fill: (x, y) =>
+      if x == 0 or y == 0 { gray },
+    inset: (right: 1.5em),
+  )
+
+  show table.cell: it => {
+    if it.x == 0 or it.y == 0 {
+      set text(white)
+      strong(it)
+    } else if it.body == [] {
+      // Replace empty cells with 'N/A'
+      pad(..it.inset)[_N/A_]
+    } else {
+      it
+    }
+  }
+
+  let a(x) = table.cell(
+    fill: green.lighten(60%),
+  )[#x]
+  let b(x) = table.cell(
+    fill: aqua.lighten(60%),
+  )[#x]
+
+  table(
+    columns: 3,
+    [], [w/ Small Allocator], [w/o  Small Allocator],
+    [Time], a("3933.59s"), b("5010.23s")
+  )
+};
+
+#profiling
+
+One can infer from the profiling data that 1) compilation time is a big concern for large functional projects, and 2) allocation optimization is one of the effective way to make the progress faster, leading to over 27% of speed up in `mathlib4` full compilation. In following chapters, we will see how Lean4 and other functional languages leverage various memory management tricks to deliver better performance.
+
+
+// = Introduction (Old)
+// In recent years, proof assistants have surged in popularity across both academic and industrial domains. Computer scientists begin to use proof assistants to verify realistic software systems as exemplified by @Leroy-Compcert-CACM @composable-verification. Simultaneously, mathematicians are beginning to seriously integrate computer-aided proofs into their workflows @terence_tao_lean_tour @Fermat_last_theorem. Such trend leads to serious considerations for the design and implementation of high-performance functional programming languages.
+
+// An emerging challenge lies in efficiently managing memory resources for functional languages. Essentially, the memory management policy must address rapid allocations and deallocations to enhance memory reuse and locality. In a general context, global allocators strive to adapt to these patterns by establishing various levels of free lists, as discussed in @locality-alloc @leijen2019mimalloc @snmalloc. Functional programming, distinguished by its inherent immutability, requires even more frequent memory reuse to accommodate its specific needs.
+
+// Efficient memory management and locality optimization remain central to the evolution of modern programming languages and software development. The memory resources of functional languages are typically managed by garbage collectors. Depending on different user scenarios, various implementations may configure their collection algorithms with distinct characteristics, as evidenced by the diverse approaches in @haskell, @ocaml, @ocaml-pm, @erlang-1, and @erlang-2. Despite these differences, these advanced collection algorithms universally adopt generational approaches, underscoring the significance of locality and efficient memory reuse in frequently accessed (hot) regions. Recently developed languages like Koka and Lean 4 have illuminated the potential of combining Rc-based (Reference Counting) runtime and reuse analysis to achieve in-place mutability within a purely functional environment, as indicated by @lean-4 @perceus @frame-limited @fp2. Researchers have termed this innovative approach as the "functional-but-in-place" (FBIP) paradigm. 
+
+// This work examines the characteristics of functional programming alongside previous research in the domain of memory management and reuse analysis. By conducting case studies, this study aims to provide a comprehensive understanding of the essence of memory reuse, as well as the advantages and disadvantages of the new Rc-based methods. Furthermore, by proposing a high-level runtime in Rust, this work will suggest potential enhancements to address existing challenges in reuse analysis and the Rc-based runtime framework.
+
+// = Functional Programming
+// == A Brief Overview
+// Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: for example, values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
+
+// However, programming within an immutable framework requires a paradigm shift from traditional imperative programming. Data structures in functional languages are typically built inductively, following an algebraic approach @construction @Pfenning2018 @hottbook. A functional programming language might start with simple built-in types like natural numbers and boolean values, then construct new types as combinations or variations of existing ones. For instance, a `List` structure in Lean 4 could be defined as:
+// ```lean
+// inductive List : Type :=
+//   | Nil 
+//   | Cons (hd : Nat) (tl : List)
+// ```
+// Here, `List` represents a sum type of `Nil` and `Cons`, with `Cons` being a product type combining `Nat` and `List`.
+
+// Given this construction, it's important to note that operations on functional data structures can be defined as functions in the mathematical sense. Consider the following red-black tree in Haskell from @algoxy:
+// ```hs
+// data Color = R | B | BB
+// data RBTree = Empty | Node Color RBTree Int RBTree
+// ```
+// Assume that tree is represented as tuples aliased as type $TT$, $phi$ is a function that rebalance doubly blacked nodes and $mu$ is a function that blackens a node. Within this structure, the deletion operation can be articulated in terms of mathematical functions. 
+// $
+// f &: ZZ times TT -> TT\
+// f(x, t) &= 
+// cases(
+//   emptyset\, & t = emptyset,
+//   phi(C, f(x, l), k, r)\, & t = (C, l, k, r) and x < k,
+//   phi(C, l, k, f(x, r))\, & t = (C, l, k, r) and x > k,
+//   r\, & t = (C, l, k, r) and x = k and l = emptyset and C != B,
+//   mu(r)\, & t = (C, l, k, r) and x = k and l = emptyset and C = B,
+//   l\, & t = (C, l, k, r) and x = k and r = emptyset and C != B,
+//   mu(l)\, & t = (C, l, k, r) and x = k and r = emptyset and C = B,
+//   phi(C, l, m, (f, min(r), r))\, &"otherwise"
+// )
+// $
+
+// == Introductions and Eliminations
+
+// In order to effectively reason about these inductively defined data structures (in the mathematical manner mentioned in the previous chapter), functional programming languages must generate various type-theoretical rules associated with the type definitions. From a computational perspective, the most crucial among these are the introduction rules and the elimination rules. As an interesting comparison, @Lafont1997InteractionC also mentioned that the fundamental laws of computation are commutation (where new combinations are created) and annihilation (where cells are eliminated). In the context of functional programming, introduction rules relate to calls to constructors, facilitating the creation of new instances of a type. On the other hand, elimination rules pertain to the decomposition of values from an inductively defined object, such as through field projections and pattern matching, enabling the extraction and use of the data encapsulated within the structure.
+
+// The operations that manipulate these data structures rely heavily on the application of these rules. In the subsequent section, we will explore two additional case studies that illustrate these common patterns, which are extensively utilized in practical scenarios.
+
+// === Red-black Tree Balancing
+
+// The provided code from @algoxy demonstrates an operation on the red-black tree, specifically the rebalancing process following an insertion. This code transforms the tree's structure to preserve the invariants that red-black trees must maintain. Implemented in Haskell, this function employs a pattern-matching style:
+// #text(9pt)[
+// ```hs
+// balance B (Node R (Node R a x b) y c) z d = Node R (Node B a x b) y (Node B c z d)
+// balance B (Node R a x (Node R b y c)) z d = Node R (Node B a x b) y (Node B c z d)
+// balance B a x (Node R b y (Node R c z d)) = Node R (Node B a x b) y (Node B c z d)
+// balance B a x (Node R (Node R b y c) z d) = Node R (Node B a x b) y (Node B c z d)
+// balance color l k r = Node color l k r
+// ```
+// ]
+// In this function, the left-hand side applies pattern matching to deconstruct the tree nodes and checks if their configuration falls into one of the specified categories for rebalancing. The four cases listed address different possible states of imbalance caused by insertion. On the right-hand side, if a potential violation of the red-black tree properties is identified, a new node structure is constructed. This reconstruction uses the fields decomposed from the original nodes on the left-hand side, effectively rebalancing the tree and ensuring that it adheres to the necessary red-black properties. Indeed, as one may notice, this function heavily employs consecutive uses of elimination rules and introduction rules.
+
+// === Normalization of (Partial) Evaluation
+
+// Another compelling example is found in the domain of dependent type checkers, which are fundamental to proof assistants. In a dependently typed system, the core language does not make a clear distinction between types and data. As a consequence, for type checking to be executed, proof assistants must (weakly) normalize the language terms @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory. A notable strategy to accomplish this is through Normalization by Elaboration (NbE), also known as Normalization by Partial Evaluation (NbPE) @normalization-by-evaluation @NbPE.
+
+// The basic idea behind NbPE is to devise a specific semantic interpretation, denoted as 
+// $lr(bracket.l.double dot.c bracket.r.double)$, that can be efficiently evaluated in the host language. This is coupled with a quote (or reify) operation that converts an object from the semantic interpretation domain back into the language's terms. The interpretation and reification, in a pair, garantee that @NbPE-diagram commutes.
+
+// #figure(
+//   caption: "Diagram of NbPE",
+//   fletcher.diagram( {
+//   let (g, f, G, F) = ((-1, 1), (-1, -1), (1, 1), (1, -1));
+//   node(f, $T$)
+//   node(g, $T'$)
+//   node(F, $lr(bracket.l.double T bracket.r.double)$)
+//   node(G, $lr(bracket.l.double T' bracket.r.double)$)
+//   edge(f, g, "->", "norm")
+//   edge(f, F, "->", $bracket.l.double" "dot.c" "bracket.r.double$)
+//   edge(F, G, "->", "eval")
+//   edge(G, g, "->", "quote/reify")
+// })) <NbPE-diagram>
+
+// The provided code from @elaberation-zoo showcases a way to apply NbPE to the Untyped Lambda Calculus (UTLC):
+
+// ```hs   
+// eval :: Env -> Tm -> Val
+// eval env = \case
+//   Var x     -> fromJust $ lookup x env
+//   App t u   -> eval env t $$ eval env u
+//   Lam x t   -> VLam x (\u -> eval ((x, u):env) t)
+//   Let x t u -> eval ((x, eval env t):env) u
+
+// quote :: [Name] -> Val -> Tm
+// quote ns = \case
+//   VVar x                 -> Var x
+//   VApp t u               -> App (quote ns t) (quote ns u)
+//   VLam (fresh ns -> x) t -> Lam x (quote (x:ns) (t (VVar x)))
+// ```
+
+// One can observe that such operations heavily involve the elimination and introduction processes, executed in a consecutive manner.
+
+// #reuse-section
+
+= Aggregate Update in Functional Programming: An Early Story <early-story>
+
+Unique properties including referential transparency has been attracting people from various communities to introduce functional languages into their research and production environments. As such, a primary challenge is to workaround the performance issues implied by immutability. In this chapter we focus on summarizing different approaches to tackle the so called "Aggregate Update Problem" (also known as "Large Object Problem") in functional programming environments.
+
+== What is the "Aggregate Update Problem"?
+
+Following the convention in @aggregate-problem, aggregate data types typically refers to data structures that collects an amount of elements in a dense, usually contiguous memory area, such as (multi-dimensional) arrays and strings. 
+
+In an imperative environment, these data structures provide handy ways to store and access elements in an uniform manner with excellent locality. In the functional world, however, one cannot mutate the underlying memory objects (in user-visible ways). Otherwise, referential transparency can potentially be destroyed. Purely functional expressions are devoid of side effects. Many implementations utilize this fact to avoid repeated evaluations of the same expressions. If the memory object referred an expression is mutated in unexpected ways, the whole program may produce undesired results.
+
+As shown in @functional-programming, to represent state transitions, functional programs carrying aggregate state objects as the arguments to their continuation. The most safe and conservative way to update aggregate objects is to clone them in whole with required change applied and then pass newly created objects to the continuation. If there are any evaluation referring to old objects, their existing results can still be used as nothing is changed in their memory state.
+
+```haskell
+addOne : Array Int -> Int -> Array Int
+addOne arr idx = 
+  if idx >= len arr 
+  then arr 
+  else let elm = get arr idx in set arr idx (elm + 1) 
+```
+For instance, in the above code, the builtin function `set` can be implemented to allocate a new array, copying the original array with the element at the provided index modified. The performance issue is immediately apparent. Increasing all elements in a linear array becomes a $O(n^2)$ operation with additional penalty on memory management.
+
+Many solutions are proposed to workaround such issues. One mitigation is to use specially designed functional data structures. The intuiation is that the "Aggregate Update Problem" only happens on "Large Objects". One can break down the data structure into small pieces thus localize the impact of modifications, creating updated objects with mutation happening on a small subset of the sharded pieces while reusing most unchanged parts that can be easily tracked via few pointers. Fingertrees, for example, are typically used as "arrays" in the functional world @algoxy @purely-functional-data-structures. One of their variants is adopted into the standard library of Scala with an amortized extra cost that is almost negligible under a wide range of workloads @scala-pr @rrb-vector.
+
+Efficient drop-in replacements for imperative data structures may not be always available. Pointer chasing implied by large object sharding can affect cache friendliness negatively, thus introduces costs that are difficult to be amortized elegantly. More importantly, general usability demands researchers to find out a non-intrusive method, such that programmers can write functional programs in simple and productive ways without designing sophisticated ad-hoc algorithms while the compilers can produce well-optimized targets that workaround the "Aggregate Update Problem" automatically.
+
+@aggregate-problem suggests a multi-leveled solution using both static analysis and runtime support. In-place mutations are forbid in functional languages as they may break referential transparency and produce side effects that invalidate the evaluation of other expressions. However, it is implied that if a compiler has the knowledge that a mutation will never produce visible side effects#footnote("Strictly speaking, allocations, locality, and other low-level metrics are observable side effects. They are ignored in most context including this survey as they do not affect the evaluation."), then the freedom should be granted to utilize such mutations for optimizations. A particular example arises when a reference to an object proves to be exclusive. If an aggregate object has its last reference being used for a functional update which creates new object with required fields updated without carrying out any access to the old one, then the compiler can infer that the original object is no longer reachable after the operation. Utilizing the underlying memory becomes legal as external observers do not care about exact memory locations of objects.
+
+ For an aggregate data structure, the compiler first tries to check statically if an update to such aggregate is operating on its last reference. If so, instead of emitting copying, the update can be applied in place as imperative programs. Such analysis can be done in a context-sensitive manner, inlining and duplicating code pieces to select more applicable sites. Necessary code motions can be combined into the optimization, alternating order of evaluation to achieve maximal in-place updates. When all the means above run into a dead end, runtime checking of referece counting can kick in to capture the last opportunity of memory reuse.
+
+ The simplicity of functional programs contributes to the static analysis. It is easy to build a dataflow diagram of values in functional programs, refered as "graph-reduction" in @aggregate-problem. For an aggregate type of interest, one can pick up the set of operations that construct and use corresponding objects. Arrays, for example, can be produced by its constructors and mutators and used by projections that access member fields.   
+
+#let dataflow-diagram = { 
+  let Update = (0, -1)
+  let Get = (0, 1)
+  let Proj = (1, 0)
+  let NewArr = (-1, 0)
+  fletcher.diagram(
+    node-stroke: 1pt,
+    edge-stroke: 1pt,
+    node(Update, "set a 0 5"),
+    node(Get, "set a 2 7"),
+    node(Proj, "get b 1"),
+    node(NewArr, "Array.new [1, 2, 3]"),
+    edge(NewArr, Get, "-|>"),
+    edge(NewArr, Update, "-|>"),
+    edge(Update, Proj, "-|>"),
+  )
+}
 
 #figure(
-  caption: "Diagram of NbPE",
-  fletcher.diagram( {
-  let (g, f, G, F) = ((-1, 1), (-1, -1), (1, 1), (1, -1));
-  node(f, $T$)
-  node(g, $T'$)
-  node(F, $lr(bracket.l.double T bracket.r.double)$)
-  node(G, $lr(bracket.l.double T' bracket.r.double)$)
-  edge(f, g, "->", "norm")
-  edge(f, F, "->", $bracket.l.double" "dot.c" "bracket.r.double$)
-  edge(F, G, "->", "eval")
-  edge(G, g, "->", "quote/reify")
-})) <NbPE-diagram>
+  dataflow-diagram,
+  caption: [Simple Dataflow Diagram for Functional Array Objects]
+) <dataflow-diagram>
 
-The provided code from @elaberation-zoo showcases a way to apply NbPE to the Untyped Lambda Calculus (UTLC):
+In a functional environment, such dataflow diagram should be a DAG (directed acyclic dragram). Without mutable refereces, it is impossible to construct backedges. For the purpose of this 
 
-```hs   
-eval :: Env -> Tm -> Val
-eval env = \case
-  Var x     -> fromJust $ lookup x env
-  App t u   -> eval env t $$ eval env u
-  Lam x t   -> VLam x (\u -> eval ((x, u):env) t)
-  Let x t u -> eval ((x, eval env t):env) u
-
-quote :: [Name] -> Val -> Tm
-quote ns = \case
-  VVar x                 -> Var x
-  VApp t u               -> App (quote ns t) (quote ns u)
-  VLam (fresh ns -> x) t -> Lam x (quote (x:ns) (t (VVar x)))
-```
-
-One can observe that such operations heavily involve the elimination and introduction processes, executed in a consecutive manner.
-
-#reuse-section
 
 = High-level Memory Reuse Runtime
 
