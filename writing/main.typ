@@ -35,6 +35,7 @@
 )
 
 #set text(font: "EB Garamond")
+#set math.equation(numbering: "(1)")
 
 = Introduction
 
@@ -107,13 +108,13 @@ Before we moving on, let's answer the following questions:
 1. Why does the performance of functional languages matter? 
 2. To what extend does the immutability affects the overall efficiency?
 
-In order to answer these questions, let's conduct an experiment on the Lean4  @lean-4 proof assistant. Lean4 and other dependent-typed functional programming languages are attracting increasingly more interests along cryptography, certified compilation and mathematics community. Compiler researchers and cryptography researchers are using them to verify critial programs. Mathematicians are embedding proof assistants into their workflows to tackle some most challenging works such as formalizing proofs to the Fermat's Last Theorem for regular primes @flt.
+In order to answer these questions, let's conduct an experiment on the Lean4  @lean-4 proof assistant. Lean4 and other dependent-typed functional programming languages are attracting increasingly more interests among cryptography, certified compilation and mathematics community. Compiler researchers and cryptography researchers are using them to verify critial programs. Mathematicians are embedding proof assistants into their workflows to tackle some most challenging works such as formalizing proofs to the Fermat's Last Theorem for regular primes @flt.
 
-For proof assistants, their type systems are rather complicated, which usually requires bidirectional type checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and NbPE @NbPE techniques on a relatively large ruleset. Many proof assistants choose to boostrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
+For proof assistants, their type systems are rather complicated, which usually require bidirectional type checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and NbPE @NbPE techniques on a relatively large ruleset. Many proof assistants choose to boostrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
 
 `mathlib4` @mathlib4 is a community driven project to formalize as much as mathematics with Lean4. As the project grows bigger and bigger, compilation (dominated by type checking mathematical theorems) time becomes increasingly concerning. There are $4886$ targets inside the project up to the time of access. Due to the long time of compilation, Lean4 community has to distribute "elaberated" #footnote("To check type equivalence, expressions are elaborated into certain normal forms via NbPE. Such an algorithm works like an interpreter that translates lambda terms into a semantic domain, evaluates it in such domain and converts them back to concrete lambda terms. The process manipulates a large amount of AST nodes in two different domains.") cache files to skip over some most time-consuming parts inside the compilation pipeline.
 
-We evaluate the time of full `mathlib4` compilation (not using any cache) with and without small allocators. Lean4 is using some advanced techiniques to mitigate performance penalty due to immutability. Small allocators one of its means to reduce the cost due to frequent allocations (which reflects the impact of immutability) by caching small memory blocks aggressively. We will make a more detailed discussion in upcomming sections. For now, the important take away is that the difference in compilation time can reflect the extend to which allocations are affecting the performance of functional programs. The device we used in Surface Pro 11 with 12 Qualcomm X Elite AArch64 cores. It is of a high-end profile for daily works. We allow the Lean4 compiler to utilize all 12 cores to parallel the process.
+We evaluate the time of full `mathlib4` compilation (not using any cache) with and without the Small Allocator. Lean4 is using some advanced techiniques to mitigate performance penalty due to immutability. The Small Allocator is one of its means to reduce the cost due to frequent allocations (which reflects the impact of immutability) by caching small memory blocks aggressively. We will make a more detailed discussion in upcomming sections. For now, the important take away is that the difference in compilation time can reflect the extend to which allocations are affecting the performance of functional programs. The device we used is Surface Pro 11 with 12 Qualcomm X Elite AArch64 cores. It is of a high-end profile for daily works. We allow the Lean4 compiler to utilize all 12 cores to parallelize the process.
 
 #let profiling = {
   set align(center)
@@ -268,7 +269,7 @@ Unique properties including referential transparency has been attracting people 
 
 Following the convention in @aggregate-problem, aggregate data types typically refers to data structures that collects an amount of elements in a dense, usually contiguous memory area, such as (multi-dimensional) arrays and strings. 
 
-In an imperative environment, these data structures provide handy ways to store and access elements in an uniform manner with excellent locality. In the functional world, however, one cannot mutate the underlying memory objects (in user-visible ways). Otherwise, referential transparency can potentially be destroyed. Purely functional expressions are devoid of side effects. Many implementations utilize this fact to avoid repeated evaluations of the same expressions. If the memory object referred an expression is mutated in unexpected ways, the whole program may produce undesired results.
+In an imperative environment, these data structures provide handy ways to store and access elements in an uniform manner with excellent locality. In the functional world, however, one cannot mutate the underlying memory objects (in user-visible ways). Otherwise, referential transparency can potentially be destroyed. Purely functional expressions are devoid of side effects. Many implementations utilize this fact to avoid repeated evaluations of the same expressions. If some memory objects referred by an expression are mutated in unexpected ways, the whole program may produce undesired results.
 
 As shown in @functional-programming, to represent state transitions, functional programs carrying aggregate state objects as the arguments to their continuation. The most safe and conservative way to update aggregate objects is to clone them in whole with required change applied and then pass newly created objects to the continuation. If there are any evaluation referring to old objects, their existing results can still be used as nothing is changed in their memory state.
 
@@ -277,17 +278,18 @@ addOne : Array Int -> Int -> Array Int
 addOne arr idx = 
   if idx >= len arr 
   then arr 
-  else let elm = get arr idx in set arr idx (elm + 1) 
+  else let elm = get arr idx in addOne (set arr idx (elm + 1)) (idx + 1)
 ```
 For instance, in the above code, the builtin function `set` can be implemented to allocate a new array, copying the original array with the element at the provided index modified. The performance issue is immediately apparent. Increasing all elements in a linear array becomes a $O(n^2)$ operation with additional penalty on memory management.
 
+== Solutions to the Aggregate Update Problem
 Many solutions are proposed to workaround such issues. One mitigation is to use specially designed functional data structures. The intuiation is that the "Aggregate Update Problem" only happens on "Large Objects". One can break down the data structure into small pieces thus localize the impact of modifications, creating updated objects with mutation happening on a small subset of the sharded pieces while reusing most unchanged parts that can be easily tracked via few pointers. Fingertrees, for example, are typically used as "arrays" in the functional world @algoxy @purely-functional-data-structures. One of their variants is adopted into the standard library of Scala with an amortized extra cost that is almost negligible under a wide range of workloads @scala-pr @rrb-vector.
 
 Efficient drop-in replacements for imperative data structures may not be always available. Pointer chasing implied by large object sharding can affect cache friendliness negatively, thus introduces costs that are difficult to be amortized elegantly. More importantly, general usability demands researchers to find out a non-intrusive method, such that programmers can write functional programs in simple and productive ways without designing sophisticated ad-hoc algorithms while the compilers can produce well-optimized targets that workaround the "Aggregate Update Problem" automatically.
 
 @aggregate-problem suggests a multi-leveled solution using both static analysis and runtime support. In-place mutations are forbid in functional languages as they may break referential transparency and produce side effects that invalidate the evaluation of other expressions. However, it is implied that if a compiler has the knowledge that a mutation will never produce visible side effects#footnote("Strictly speaking, allocations, locality, and other low-level metrics are observable side effects. They are ignored in most context including this survey as they do not affect the evaluation."), then the freedom should be granted to utilize such mutations for optimizations. A particular example arises when a reference to an object proves to be exclusive. If an aggregate object has its last reference being used for a functional update which creates new object with required fields updated without carrying out any access to the old one, then the compiler can infer that the original object is no longer reachable after the operation. Utilizing the underlying memory becomes legal as external observers do not care about exact memory locations of objects.
 
- For an aggregate data structure, the compiler first tries to check statically if an update to such aggregate is operating on its last reference. If so, instead of emitting copying, the update can be applied in place as imperative programs. Such analysis can be done in a context-sensitive manner, inlining and duplicating code pieces to select more applicable sites. Necessary code motions can be combined into the optimization, alternating order of evaluation to achieve maximal in-place updates. When all the means above run into a dead end, runtime checking of referece counting can kick in to capture the last opportunity of memory reuse.
+ For an aggregate data structure, the compiler first tries to check statically if an update to such aggregate is operating on its last reference. If so, instead of emitting copying, the update can be applied in place as imperative programs. Such analysis can be done in a context-sensitive manner, inlining and duplicating code pieces to select more applicable sites. Necessary code motions can be combined into the optimization, alternating order of evaluation to achieve maximal in-place updates. When all the means run into a dead end, runtime checking of referece counting can kick in to capture the last opportunity of memory reuse.
 
  The simplicity of functional programs contributes to the static analysis. It is easy to build a dataflow diagram of values in functional programs, refered as "graph-reduction" in @aggregate-problem. For an aggregate type of interest, one can pick up the set of operations that construct and use corresponding objects. Arrays, for example, can be produced by its constructors and mutators and used by projections that access member fields.   
 
@@ -314,8 +316,37 @@ Efficient drop-in replacements for imperative data structures may not be always 
   caption: [Simple Dataflow Diagram for Functional Array Objects]
 ) <dataflow-diagram>
 
-In a functional environment, such dataflow diagram should be a DAG (directed acyclic dragram). Without mutable refereces, it is impossible to construct backedges. For the purpose of this 
+In a functional environment, such dataflow diagram should be a DAG (directed acyclic graph). Without mutable refereces, it is impossible to establish backedges. Possible evaluation orders can be inferred from the dataflow diagram as topological orders. An update can happen in-place if at the time of its evaluation, all other expressions depending on the original objects are evaluated. This was specified in temporal logic (@temporal-logic) in @aggregate-problem:
 
+$
+forall s in C \\ {u}, square.stroked ("Completed"(u) => "Completed"(s)) \
+forall s in C \\ {u}, square.stroked ("Completed"(u) => not (diamond.stroked "Completed"(s)))
+$ <temporal-logic>
+
+where $C$ is the set of all uses and $u$ is the update operation.
+
+The analysis can be applied statically during compilation, eliminating copies without special runtime support. If there are multiple possible evaluation orders of a dataflow diagram, one can schedule the evaluation to maximize the opportunity for in-place update. As we have summarized previously, if all these means fail, one can still utilize reference counting to capture the exclusivity.
+
+== Limitations of the Static Analysis Approach
+
+There are several limitations of the static analysis approach:
+
+- First, in order for @temporal-logic to work, the possible set of operations must be well-defined. For arrays, we know that a use is either another update or an element projection. These operations garantee that changing the array does not affect the evaluated value.
+- Second, the work in @aggregate-problem uses RC (reference counting) as the last method to avoid unnecessary copying for aggregate types without considering optimizing the RC operations themselves. It concludes RC as a method that introduces extra cost on fast paths. To avoid such cost, the destructions of RC-mananged objects are usually deferred, which makes it imcompatible with the purpose of in-place updates. We will revisit the RC-based approaches in next chapter.
+
+The first limitation also applies to some other works like @SISALSA. @SISALSA has a sophisticated system to optimize functional languages with streaming and iterations. As such, it also focus on a fixed set of operations that is important for streaming and iterations.
+
+== Memory Management Optimization in General
+
+Previous sections in this chapter demonstrates how researchers tackle the Aggregate Update Problem directly. However, other small objects and composite types that is not "considered" by previous in-place update analysis still face the performance penalty due to frequent constructions and destructions. Let's step backward a little bit and move our view to a more general settings: how one can use memory management algorithms to speed up programs that demands frequent memory resource acquisition and release.
+
+In @functional-programming, we evaluated how the Small Allocator feature in Lean4 affect the performance. Small Allocator is a form of freelist local cache widely used in many modern allocators. Localized freelist cache with sophisticated sharding strategy is used in Mimalloc @leijen2019mimalloc and SnMalloc @snmalloc. Similar to Lean4 @lean-4, Mimalloc is playing a crucial role in the runtime of the Koka programming language @Koka. 
+
+Userspace memory pages are acquired from OS via syscalls. However, one cannot always utilize syscalls to obtain memory as syscalls only operate on page level and the roundtrip between userspace and kernel space proves to be costly especially when such trips are taken frequently. Allocators such as those inside the system-wide C libraries behave as a cache layer between applications and kernels. They defer returning acquired pages to OS. When applications apply for memory, instead of allocating pages from OS, allocators return available blocks from freelists if there are suitable candidates. Modern allocators further shards freelists: 1) different freelists can be maintained for different size classes, and 2) besides the global memory pool, separate freelists can be installed into thread-local storage. Imagine the consecutive deallocations and allocations in functional programming. Memory blocks can be pushed into the local freelist upon deallocations and reused immediately for incomming allocations, providing a similar effect for inplace mutations. However, it is important to notice that, the allocations/deallocations must happen in time. Deferred deallocations, as used in many implementations to speed up fastpath, may defeat the efforts of freelists to some extend.
+
+Similar strategies and ideas are used in various managed language runtimes. @haskell described the block-structured heap for the Haskell programming language. @rc-immix @lxr showcases that a complicated generational GC can utilize a partial RC encoded in a few bits to manage objects with short lifespan, which can be rapidly reclaimed and reused without going though extra stages.
+
+= Revisit Referece Counting
 
 = High-level Memory Reuse Runtime
 
