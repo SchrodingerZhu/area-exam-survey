@@ -56,7 +56,7 @@ In order to answer these questions, we arrange the survery in the following stru
 
 - @early-story will summarize traditional methods to handle such immutability issues. This section mainly includes two aspects: 1) the definition of "large object" and "aggregate update" problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions in functional languages.
 
-- Section TODO continues on exploring the solutions but focusing on some newly developed methods based reuse analysis. This section will discuss runtime requirement and static analysis required by reuse analysis. Besides solving the inplace update problem, it also explains why reference-counting (RC) based reuse runtime enables a straightforward way to wrap imperative data structures into functional programs. Program patterns favored by reuse analysis will also be covered.
+- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based reuse analysis. This section will discuss runtime requirement and static analysis required by reuse analysis. Besides solving the inplace update problem, it also explains why reference-counting (RC) based reuse runtime enables a straightforward way to wrap imperative data structures into functional programs. Program patterns favored by reuse analysis will also be covered.
 
 - Section TODO summarizes prior methods and lists some remaining issues with these solutions. The survery will propose potential solutions and provide a detailed discussion on implementation difficulties.
 
@@ -336,7 +336,7 @@ There are several limitations of the static analysis approach:
 
 The first limitation also applies to some other works like @SISALSA. @SISALSA has a sophisticated system to optimize functional languages with streaming and iterations. As such, it also focus on a fixed set of operations that is important for streaming and iterations.
 
-== Memory Management Optimization in General
+== Memory Management Optimization in General <mem-management>
 
 Previous sections in this chapter demonstrates how researchers tackle the Aggregate Update Problem directly. However, other small objects and composite types that is not "considered" by previous in-place update analysis still face the performance penalty due to frequent constructions and destructions. Let's step backward a little bit and move our view to a more general settings: how one can use memory management algorithms to speed up programs that demands frequent memory resource acquisition and release.
 
@@ -346,7 +346,37 @@ Userspace memory pages are acquired from OS via syscalls. However, one cannot al
 
 Similar strategies and ideas are used in various managed language runtimes. @haskell described the block-structured heap for the Haskell programming language. @rc-immix @lxr showcases that a complicated generational GC can utilize a partial RC encoded in a few bits to manage objects with short lifespan, which can be rapidly reclaimed and reused without going though extra stages.
 
-= Revisit Referece Counting
+= Revisit Reference Counting <RC-Revisit>
+
+We have summarized some static analysis solutions to the Aggregate Update Problem in previous chapters. These analysis, however, failed to break the boundary of RC (Reference Counting) operations. Therefore, RC is traditionally considered as a slow and fallback solution rather than the main focus of previous studies. In this chapter, we look into recent progress on introducing RC as primary operations of the runtime. As one will see, these new approaches make RC a reasonable choice for high-performance runtime implementation. The simplicity of RC-managed object also allows safe and efficient interpolation across the boundary between functional and imperative world.
+
+== Reference-Counted RAII Objects
+
+Instead of jumping into RC-oriented memory reuse analysis, let's first understand how RC is conventionaly used. One typical scenario is to use reference counting to manage RAII (Resource Acquire Is Initialization) Objects, such as `std::shared_ptr` in C++ or `std::rc::Rc` in Rust. The initial constructors of such RC pointers are in charge of allocating the associated memory resource, the copy constructors are used to increase the reference count, and the destructors are responsible for decreasing the count and releasing the memory if last reference is to be released.
+
+```rust 
+fn and_one(list: Rc<List<i32>>, acc: Rc<List<i32>>) -> Rc<List<i32>> {
+  match &*list {
+    List::Cons(hd, tl) => {
+      let updated = Rc::new(List::Cons(hd + 1, acc));
+      add_one(tl.clone(), updated)
+    },
+    List::Nil => acc
+  }
+  // drop(acc); drop(list);
+}
+```
+
+Usually, if a RAII object is passed into a function or created inside a function, the function takes the responsibility to clean up the resource if needed. In the case of RC pointers in most languages, the compiler inserts calls to their destructors when exiting their lexical scope. For example, in the demo above, `drop` functions are implicitly invoked before the function returns. 
+
+The clean up routines are deferred such that one can have a clean fastpath. The main body of the function can possibly include no calls to allocators and RC-related checkings or branches. However, as discussed in <mem-management>, deferred memory reclamation can cause issues on efficient memory reuse.
+
+We now face a tricky problem. We want our fastpaths to be devoid of cold deallocation routines. In the same time, we also want to utilize RC to achieve memory reuse as it captures the exclusivity precisely.
+
+== Reference Counting as First-class Operations
+
+To tackle the problem mentioned above, @ullrich2020countingimmutablebeansreference introduces `inc`, `dec`, `reset` and `reuse` operators into the IR of the Lean4 programming language.
+
 
 = High-level Memory Reuse Runtime
 
