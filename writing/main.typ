@@ -375,8 +375,77 @@ We now face a tricky problem. We want our fastpaths to be devoid of cold dealloc
 
 == Reference Counting as First-class Operations
 
-To tackle the problem mentioned above, @ullrich2020countingimmutablebeansreference introduces `inc`, `dec`, `reset` and `reuse` operators into the IR of the Lean4 programming language.
+To tackle the problem mentioned above, @ullrich2020countingimmutablebeansreference introduced `inc`, `dec`, `reset` and `reuse` operators into the IR of the Lean4 programming language. This is a novel idea in functional programming context. For each expressions, we not only focus on how the value is computed but also explicitly mark up the associated operations used to maintain reference counts and manage memory resource.
 
+```haskell
+map f xs = case xs of
+  | Nil -> ret xs
+  | Cons -> 
+    let x = proj xs 0;
+    let y = proj xs 1;
+    inc y;
+    let w = reset xs;
+    let z = apply f x;
+    let zs = map f y;
+    let r = reuse w in Cons z zs;
+    ret r
+```
+Given a program composed with traditional IR operations (including projections, applications and constructor calls), the compiler can statically infer the required RC operations. Once explicit RC operations are obtained, more optimization opportunities are exposed to the compiler. For example, in the code above, the compiler notice that the memory associated with `xs` can possibly be reused. Hence, instead of allocating memory for constructors, a "destructive decrement" (`reset` operation) is inserted. A later on `reuse` operation can then avoid allocations if the memory pointer passed in is not null. 
+
+The process proposed in @ullrich2020countingimmutablebeansreference involves three steps:
+1. Inplace update operations including `reset` and `reuse` are inserted into feasible sites.
+2. Some functions may not need to use RC pointers as they only require immutable projections or other trivial operations on their input arguments. Such functions can be converted to "borrow semantics" to avoid RC operations.
+3. With destructive operations and borrowing operations inserted, it becomes straightforward to add necessary reference counting operations.
+
+There are still other challenges such as how to tweak the functional data structures such as red-black trees to better fit into the in-place update scheme and how to efficiently maitain the reference counting in multi-threaded environments. These implementations details are discussed in @ullrich2020countingimmutablebeansreference. We skip them here to focus on the main topics.
+
+Lean4 is implemented based on @ullrich2020countingimmutablebeansreference. Compared with other functional language implementations including `GHC`, `ocamlopt`, `MLton`, `MLKit` and RC-managed language such as `Swift`, `Lean4` can achieve best average performance across different workloads #footnote([
+  @ullrich2020countingimmutablebeansreference benchmarked binary trees, symbolic differentiation, constant folding, quick sort and red-black tree based association map.
+]). The decomposed measurements shows that the `reuse/reset` insertion pass along brings about $38%$ speedup compared with the baseline implementation.
+
+== Perceus: Garbage Free Reference Counting with Reuse
+In @ullrich2020countingimmutablebeansreference, reference counting maintainence operations are inserted as the fallback of destructive in-place update. It turns out that these operations are subject to further optimization opportunities. In this section, let's take look at how Koka @Koka improves the performance surrounding RC operations @perceus.
+
+=== Destructive Move: A New Ownership Model
+
+Before jumping into the analysis and optimization algorithms, we first need to refresh our mindset towards RC pointers. Holding a RC pointer grants the access to the underlying managed object. All RC holders have a shared ownership of the associated memory resource. 
+
+An interesting question is how to understand passing RC pointers to structure fields or callees. Due to historical absence of move semantics in C/C++, the usual mental model behind such operations is to create a new share of the ownership for new recipients. The reference count is increased and a new RC pointers is duplicated from the original one while keeping the original RC pointer valid.
+
+This leads to several problem, especially for efficient reuse of the memory resource. Even if no explicit operations exist after passing a RC pointer to a subroutine, current call frame implicitly holds a share of the ownership, obstructing the tail call optimization and more importantly, making the memory resource impossible to be used during the subroutine call.
+
+Unlike C/C++, Rust @rust-affine programming language defaults to destructive move semantics. Once a PC pointer is passed to subroutines or structures, it is no longer accessible from current frame. The responsibility of maintaining reference count and destruction is also moved from current call frame to new "shared holders". If accessibility is really needed after a destructive move, a copy of the RC pointer should be created before such operations.
+
+It is arguable that move semantic is more beneficial in the management of RC objects. It solves the issue of holding of the RC pointers uselessly. In the functional programming, however, we normally don't expect an expression to become inaccessible after its first usage#footnote("We will discuss about linearity very soon."). However, it is analyzable whether a value will be used again after a move. Hence, it is possible to default on moving the RC ownership while inserting necessary clone operation on need.
+
+=== Reuse Analysis under Destructive Move
+In @ullrich2020countingimmutablebeansreference, the algorithms begins with inserting `reset` and `reuse`. With destructive move, the steps are reordered in @perceus. Given a spartan lambda algebra, one can first insert the `inc` and `dec` operations in the first step, assuming the move semantic. Notice that the reference count can now be decreased as soon as its associated pointer is no longer used anywhere in current frame.
+
+For instance, consider following program:
+```haskell
+map f xs = match xs with
+  | Nil => return xs
+  | Cons y ys => 
+    let y' = f y
+    let ys' = map f ys
+    let xs' = Cons y' ys'
+    return xs' 
+```
+The `inc` and `dec` operations can be inferred automatically. Notice that we consider pattern matching as a destructive operation, after which the decrement for the corresponding RC pointers should be inserted if the object is used anymore. The above program will be annotated as the following:
+```haskell
+map f xs = match xs with
+  | Nil => 
+    dec f; 
+    return xs
+  | Cons y ys => 
+    inc y; inc ys; dec xs;
+    inc f;
+    let y' = f y
+    let ys' = map f ys
+    let xs' = Cons y' ys'
+    return xs' 
+```
+At this stage, no inplace update is inserted and we can potentially have decrements on fast paths resulting in bad performance implications.
 
 = High-level Memory Reuse Runtime
 
