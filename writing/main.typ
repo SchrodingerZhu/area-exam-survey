@@ -526,10 +526,37 @@ Since the compiler wants to enforce the memory reuse, it optimistically inserts 
 
 All these issues show that looking ahead for constructor calls to decide whether or where a destructive decrement is to be installed may not be a favorable solution. This leads to the proposal from @frame-limited. 
 
-It is suggested that the compiler should not distinguish the decrement in two different operations. Similar to the first step analysis in @perceus, `inc/dec` operations are inserted without the consideration of reuse. The `dec` operation denotes that some memory resource becomes available within the context.
+It is suggested that the compiler should not distinguish the decrement in two different operations. Similar to the first step analysis in @perceus, `inc/dec` operations are inserted without the consideration of reuse. The `dec` operation denotes that some memory resource possibility becomes available within the context. We can do a backward dataflow analysis to populate possible allocations along the control flow. We carry the possibly available "resource" along the CFG, until it is paired with a suitable allocation at a contructor call or we no longer find any feasible allocation along the control flow. In the latter, we insert an explicit free operation of the memory resource. Another way to think about the algorithm is that we always insert a destructive decrement instead of normal `dec` and insert free if it is not paired with any reuse operation.
 
+In the situation of nested reuse, the new approach automatically "push down" the decrement operation into branches. In the situation where subroutine calls consuming a RC-managed object, the `dec` operation will not be inserted in the first place, hence the issues caused by deferred memory release no longer exist. The new approach has a nice "frame-limited" property: if the associate memory of a managed object should be released within the current frame with the decrement to its last reference count, its lifespan will not overlap with subroutine calls after the decrement. Such property is not obstructed by the code motion to achieve possible memory reuse. In other words, the timeliness of RC operations are garanteed.
 
+== Direct Interpolation: A By-Product of RC Runtime
 
+While RC-based approach provides a measure to achieve inplace mutability, programmers may still need to access imperative objects, especially when interacting with low-level system interfaces.
+
+Typically, such mechanisms require special wrappers inside the functional languages. Haskell, for example, restricts most imperative operations inside IO or other specific Monads. 
+
+FFIs (Foreign Function Interfaces) between C/C++-like languages and memory-managed languages typically require much programmer effort to make sure object pass across language boundaries in a way that conforms the memory models of both languages. Such code can be tedious to work with and the managed languages usually post some hard limitations to the allowed operations inside FFIs. JNI, for example, is not compatible with the usual thread model of C/C++ and allows only single-threaded execution @JNI.
+
+A RC-managed environment allows a much more elegant way to achieve interpolation:
+
+- First, RC runtime is simple. There is nothing other than a thin header containing the reference count added to the managed object. Functional language objects can be created outside its own environment without too much efforts. Maintaining the reference count does not demand too much effort either. One can wrap such object inside a RAII-like class to automatically maintain the correct ownership.
+- Second, exclusivity encoded in RC allows imperative languages to modify the object efficiently without breaking the assumptions of functional languages. To modify an object, the imperative language can check and ensure the exclusivity by cloning the object if needed (similar to `Rc::make_mut` in Rust). Although the cloning operation can be costly, it is typically not invoked during the fastpath. 
+
+For example, in the following code, one can implement the usual dynamic vector pushing operation on a RC managed object in Rust and then call such function inside functional language in normal ways. Promising simplicity can be achieved on both sides.
+```rust
+pub extern "C" fn vec_push(mut v : Rc<Vec<T>>, t: T) : Rc<Vec<T>> {
+  v.make_mut().push(t);
+  v
+}
+```
+
+```haskell
+// In an imaginary functional language
+collect : u32 -> Vec<u32> -> Vec<u32>
+collect 0 acc = acc
+collect x acc = collect (x - 1) (vec_push acc x)
+```
 = High-level Memory Reuse Runtime
 
 == Reference Counting Runtime without Type Erasure <no-erasure>
