@@ -986,6 +986,21 @@ author={
   year = {2018},
 }
 
+@inproceedings{parkinson2024reference,
+author = {Parkinson, Matthew J. and Clebsch, Sylvan and Wrigstad, Tobias},
+title = {Reference Counting Deeply Immutable Data Structures with Cycles: an Intellectual Abstract},
+booktitle = {n Proceedings of the 2024 ACM SIGPLAN International Symposium on Memory Management (ISMM ’24)},
+year = {2024},
+month = {June},
+abstract = {Immutable data structures are a powerful tool for building concurrent programs. They allow the sharing of data without the need for locks or other synchronisation mechanisms. This makes it much easier to reason about the correctness of the program.
+
+In this paper, we focus on what we call deep immutability from freeze, that is, objects are initially mutable, and then can be frozen, and from that point on the object and everything it refers to (transitively) can no longer be mutated. A key challenge with this form of immutability is “how to manage the memory of cyclic data structures?” The standard approach is to use a garbage collector (GC), or a back-up cycle detector. These approaches sacrifice the promptness of memory reclamation, and the determinism of memory usage.
+
+In this paper, we argue that memory underlying an immutable data structure can be efficiently managed using reference counting even in the presence of cycles, based on the observation that the cycles are themselves immutable. Our approach takes a classic algorithm for calculating strongly connected components (SCCs) and managing equivalence classes with union-find (UF), and combines them so that the liveness of each SCC can be tracked efficiently using only a single reference counter. The key observation is that since the graph is unchanging, we can calculate the SCCs once, in time that is almost linear in the size of the graph, and then use the result to reference count at the level of the SCCs. This gives precise reachability information, and does not require any backup mechanism to detect or handle cycles.},
+publisher = {ACM},
+url = {https://www.microsoft.com/en-us/research/publication/reference-counting-deeply-immutable-data-structures-with-cycles-an-intellectual-abstract/},
+}
+
   
 
 

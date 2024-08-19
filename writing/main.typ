@@ -54,11 +54,13 @@ In order to answer these questions, we arrange the survery in the following stru
 
 - @functional-programming will introduce some basic backgrounds of functional programming and common design patterns. We will be able to see when and why immutability are causing problems.
 
-- @early-story will summarize traditional methods to handle such immutability issues. This section mainly includes two aspects: 1) the definition of "large object" and "aggregate update" problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions in functional languages.
+- @early-story will summarize traditional methods to handle such immutability issues. This chapter mainly includes two aspects: 1) the definition of *large object* and *aggregate update* problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions in functional languages.
 
-- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based on reuse analysis. This section will discuss runtime facilities and static analysis required by efficient memory reuse. Besides solving the inplace update problem, it also explains why reference counting (RC) based runtime enables a straightforward way to wrap imperative data structures into functional programs.
+- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based on *reuse analysis*. This chapter will discuss runtime facilities and static analysis required by efficient memory reuse. Besides solving the inplace update problem, it also explains why reference counting (RC) based runtime enables a straightforward way to wrap imperative data structures into functional programs.
 
-- @related-future summarizes similar works related to reuse analysis in @RC-Revisit. It also lists some remaining issues with these solutions. The survey will propose potential improvements and provide a detailed discussion on implementation difficulties.
+- @related-works summarizes similar works related to reuse analysis in @RC-Revisit. It also lists some remaining issues with these solutions. 
+
+- @future-works  will propose potential improvements to the reuse analysis and provide a detailed discussion on implementation difficulties.
 
 = Functional Programming <functional-programming>
 
@@ -530,6 +532,28 @@ It is suggested that the compiler should not distinguish the decrement in two di
 
 In the situation of nested reuse, the new approach automatically "push down" the decrement operation into branches. In the situation where subroutine calls consuming a RC-managed object, the `dec` operation will not be inserted in the first place, hence the issues caused by deferred memory release no longer exist. The new approach has a nice "frame-limited" property: if the associate memory of a managed object should be released within the current frame with the decrement to its last reference count, its lifespan will not overlap with subroutine calls after the decrement. Such property is not obstructed by the code motion to achieve possible memory reuse. In other words, the timeliness of RC operations are garanteed.
 
+== Performance of the Koka Language
+
+With reuse analysis, Koka programming language can achieve C/C++-like performance for common functional workloads, even with intensive data structure operations. @koka-benchmark showcases the performance measurements in @perceus.
+
+#figure(
+  image("figures/bench-amd3600-nov-2020.png", height: 70%),
+  caption: [Koka benchmark data from @perceus. The benchmark was run on AMD 3600XT.]
+) <koka-benchmark>
+
+With the drop-guided reuse analysis from @frame-limited, the performance is improved further in @koka-benchmark2.
+
+#figure(
+  image("figures/frame-limited.png"),
+  caption: [Koka benchmark data updated with drop-guided reuse analysis from @frame-limited. The benchmark was run on AMD Ryzen 5950X.]
+) <koka-benchmark2>
+
+There are some other optimization techiniques involved in the benchmark. TRMC stands for "tail recursion modulo calculus", which provides Koka the capability to transform recursive functions in certain forms into tail recursion. FBIP stands for "functional but inplace", which is a new program paradigm proposed in @perceus. This paradigm encourages programmers to write functional programs in ways that are friendly to reuse analysis. For instance, updating and walking red-black trees can be implemented with zippers, which "linearly" hold the status of traversal and exposes more opportunities for inplace updates.
+
+The key takeaway for these benchmark results is that reuse analysis empowers functional languages with competitive performance to imperative programming by implicitly allowing inplace updates. Such technique largely improves the performance under workloads that are conventionally considered hard for functional languages such as data structure maintainence.
+
+This benchmark also breaks the popular belief that the overhead of RC makes it incapable of delivering excellent performance when memory management is frequent. On the contrary, by optimizing RC as the first-class operations, fast update paths can get rid of most of its overhead. 
+
 == Direct Interpolation: A By-Product of RC Runtime
 
 While RC-based approach provides a measure to achieve inplace mutability, programmers may still need to access imperative objects, especially when interacting with low-level system interfaces.
@@ -562,13 +586,13 @@ collect x acc = collect (x - 1) (vec_push acc x)
 
 In this chapter, we have examined how inplace mutation is achieved via RC-oriented optimizations. Contrary to traditional belief that RC can introduce maintainence overhead over fastpaths, @ullrich2020countingimmutablebeansreference @perceus @frame-limited iterate the reuse analysis algorithm and achieve no extra cost other than the necessary check of exclusivity. With @frame-limited, reuse analysis can even be used to avoid nondeterministic heap growth that can happen in both functional and imperative environment. Compared with previous solutions to the "Aggregate Update Problem", the RC-based solution is beneficical for both large and small objects and does not require manual selection of fixed operations. Compared with other performant GC methods, RC has a minimal runtime requirement which enables a shameless way to interpolate between functional and imperative world.
 
-= Related Works and Future Development <related-future>
-In the previous chapter, we have seen RC-based memory reuse approaches with combined static analysis and runtime support. In this chapter, we hope to enhance the understanding of these approaches by covering more related works and studying their limitations.
+= Related Works <related-works>
+In the previous chapter, we have seen RC-based memory reuse approaches with combined static analysis and runtime support. In this chapter, we hope to enhance the understanding of these approaches by covering more related works and studying their advantages and limitations over the RC-based approach.
 
 == Linear Types can Change the World
 In programming languages, linearity typically refer to the properties that a data of certain type can and must be used once @LinearUnique. The destructive move semantic in Rust mimics the affine linearity in the sense that an object is either moved (used) or dropped#footnote("Cloning an object creates a new object without consuming the original one. Both the original object and the newly cloned ones still conform the affine linearity.").
 
-If a type is strictly linear, its data naturally exhibits exclusivity. Consider the case of wrapping dynamic vector in functional languages. One possible solution is to always mark the vector as linear, such that all updates can happen inplace. This idea leads to the linear types and uniqueness type systems from @LinearUnique @linear. In fact, "linear types can change the world" is the title of @linear. Indeed, linear objects can be mutated internally without breaking the referential transparency; and it is a "game-changing" strategy allowing programmers to introduce a form of "mutability" into functional world.
+If a type is strictly linear, its data naturally exhibits exclusivity. Consider the case of wrapping dynamic vector in functional languages. One possible solution is to always mark the vector as linear, such that all updates can happen inplace. This idea leads to the linear types and uniqueness type systems from @LinearUnique @linear. In fact, "linear types can change the world" is the title of @linear. Indeed, linear objects can be mutated internally without breaking the referential transparency; and it is a "world-changing" strategy allowing programmers to introduce a form of "mutability" into functional world.
 
 Different from RC-based approaches, the exclusivity for linear types is encoded directly in type systems and demands no runtime checking. In the situation where the programmer has a clear understanding that certain data is to be constructed linearly, this approach can achieve memory reuse with zero penalty.
 
@@ -602,8 +626,23 @@ Compared with the RC-based reuse analysis, the bufferization pipeline is also re
 2. bufferization mainly operates on allocations and deallocations. The optimizations does not involve the maintainence of reference count.
 3. bufferization eliminates allocations if the associated buffer is materialized explicitly to memory locations that is available at the time of computation while the frame-limited reuse analysis is about paring memory tokens available within the context to allocation sites.
 
-== 
+= Future Works <future-works>
+Reuse analysis is developed with the persuit of performance and simplicity. However, RC-based approach is not without its limitations. In this chatper, we take a brief review of remaining issues. We also propose possible solutions in a way that can be applied together in a unified framework.
 
+== Cyclic References and Local Mutability
+
+A major issue of RC is that it cannot reclaim memory blocks with cyclic references. In @mutual-reference, both $A$ and $B$ are holding references to the other object. As a result, their reference count can never be deducted to zero, leading to memory leakage.
+
+#figure(
+  image("figures/cyclic.png", width: 35%),
+  caption: [Mutually referenced objects.]
+) <mutual-reference>
+
+It is worth noting that this is usually not a problem in functional languages. Functional data structures are inductively or co-inductively defined @Pfenning2018. Without mutability, there is no possibility to form cycles among functional objects. However, functional languages are not always pure, OCaml, Scala, Lisp and many other common implementations all provide mutable references locally or even globally.
+
+Project Verona @Verona @parkinson2024reference is another project utilizing RC-managed objects in its language runtime. Project Verona studies scheduling tasks safely and efficiently with concurrency. As such, the language design contains mutable and immutable regions @parkinson2024reference. When a RC-managed object escapes from a locally mutable area, a "freeze" operation will be applied and make the associate object immutable. As cycles may form inside the mutable region, the freezing procedure is designed to collect objects into multiple SCCs (Strongly Connected Components). While the reference count is recorded in the designated representative object, all other objects in the SCC tracks their path to the representative in a union-find manner. This information can be maintained by pointer tagging hence implies negligible overhead#footnote[To track the allocated objects in a region, one can maitain a singly-linked list with another extra word inside the object header.].
+
+We hope to practice this idea 
 
 // = High-level Memory Reuse Runtime
 
