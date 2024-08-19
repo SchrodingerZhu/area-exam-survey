@@ -53,6 +53,7 @@
       strong("Author: "), author,
       strong("Academic Advisor: "), advisor,
       strong("Submission Date: "), submissionDate,
+      strong("Revised: "), "August 30th, 2024"
     )
   )
 
