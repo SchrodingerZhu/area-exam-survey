@@ -39,8 +39,7 @@
 
 = Introduction
 
-// TODO: enhance citation
-Functional programming, as its name suggests, allows users to compose their programs in a way that is similar to mathematical functions. The ability to present programs similar to mathematical expressions lies in the immutable nature of functional programming. Such programming paradigm has several advantages. For instance, immutability implies race free in the context of parallel programming. The simplied control flows and immutable assumptions of functional programs largely simplifies many advanced static analyses, optimizations and program verifications.
+Functional programming, as its name suggests, allows users to compose their programs in a way that is similar to mathematical functions. The ability to present programs similar to mathematical expressions lies in the immutable nature of functional programming. Such programming paradigm has several advantages. For instance, immutability implies race free in the context of parallel programming. The straightforward control flows and immutable assumptions of functional programs largely simplifies many advanced static analyses, optimizations and program verifications.
 
 Despite its elegance, functional programming also has its downsides. Immutability appears to be a double-edged sword. Many data structures and algorithms are complicated to implement in functional paradigm. Some may even be impossible to maintain its original efficiency when written in a purely functional style. Performance for general situations in functional languages may also be affected as it is no longer possible to apply inplace updates. Objects often need to be frequently constructed or destroyed in whole even though a state change only touchs partial fields.
 
@@ -56,9 +55,9 @@ In order to answer these questions, we arrange the survery in the following stru
 
 - @early-story will summarize traditional methods to handle such immutability issues. This chapter mainly includes two aspects: 1) the definition of *large object* and *aggregate update* problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions in functional languages.
 
-- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based on *reuse analysis*. This chapter will discuss runtime facilities and static analysis required by efficient memory reuse. Besides solving the inplace update problem, it also explains why reference counting (RC) based runtime enables a straightforward way to wrap imperative data structures into functional programs.
+- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based on *reuse analysis*. This chapter will discuss runtime facilities and static analysis required by efficient memory reuse. We will not only see that RC-based approaches break the common belief on the heavy overhead of RC maintainense but also see how RC operations themselves provide precise cut-in points for static analysis. Besides solving the inplace update problem, it also explains why reference counting (RC) based runtime enables a straightforward way to wrap imperative data structures into functional programs.
 
-- @related-works summarizes similar works related to reuse analysis in @RC-Revisit. It also lists some remaining issues with these solutions. 
+- @related-works summarizes similar works related to reuse analysis in @RC-Revisit. It also lists advantages and shortcomings with these solutions. 
 
 - @future-works  will propose potential improvements to the reuse analysis and provide a detailed discussion on implementation difficulties.
 
@@ -67,7 +66,7 @@ In order to answer these questions, we arrange the survery in the following stru
 Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
 
 == State Transitions in Functional Programming
-Being immutable, however, functional paradigm has its negative implications to performance. Consider the State Monad implementation in Haskell from MTL @mtl @state-monad. Without the capability to mutate individual field, the state transition is achieved by constructing new state objects and passing it to the desired continuation (the lambda expression wrapped in `state` constructors). If the code were not properly optimized, each of such state transition is accompanied by deallocations of original state object, allocations of new state object, and necessary field data copying. This will lead to considerable performance impacts especially when such object are large enough. 
+Being immutable, however, functional paradigm has its negative implications to performance. Consider the State Monad implementation in Haskell from MTL @mtl @state-monad. Without the capability to mutate individual field, the state transition is achieved by constructing new state objects and passing it to the desired continuation (the lambda expression wrapped in `state` constructors). If the code were not properly optimized, each of such state transitions is accompanied by deallocations of original state objects, allocations of new state objects, and necessary data copying. This will lead to considerable performance impacts especially when such objects are large enough. 
 
 ```haskell
 class Monad m => MonadState s m | m -> s where
@@ -110,9 +109,9 @@ Before we move on to the solutions, let's answer the following questions:
 1. Why does the performance of functional languages matter? 
 2. To what extend does the immutability affects the overall efficiency?
 
-In order to answer these questions, let's conduct an experiment on the Lean4  @lean-4 proof assistant. Lean4 and other dependent-typed functional programming languages are attracting increasingly more interests among cryptography, certified compilation and mathematics community. Compiler researchers and cryptography researchers are using them to verify critial programs. Mathematicians are embedding proof assistants into their workflows to tackle some most challenging works such as formalizing proofs to the Fermat's Last Theorem for regular primes @flt.
+In order to answer these questions, let's conduct an experiment on the Lean4  @lean-4 proof assistant. Lean4 and other dependently-typed functional programming languages are attracting increasingly more interests among cryptography, certified compilation and mathematics community. Compiler researchers and cryptography researchers are using them to verify critial programs @composable-verification @cryptoeprint. Mathematicians are embedding proof assistants into their workflows to tackle some most challenging works such as formalizing proofs to the Fermat's Last Theorem for regular primes @flt.
 
-For proof assistants, their type systems are rather complicated, which usually require bidirectional type checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and NbPE @NbPE techniques on a relatively large ruleset. Many proof assistants choose to boostrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
+For proof assistants, their type systems are rather complicated, which usually require bidirectional type checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and NbPE @NbPE techniques on a relatively large ruleset. Many proof assistants choose to bootstrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
 
 `mathlib4` @mathlib4 is a community driven project to formalize as much as mathematics with Lean4. As the project grows bigger and bigger, compilation time (dominated by type checking mathematical theorems) becomes increasingly concerning. There are $4886$ targets inside the project up to the time of access. Due to the long time of compilation, Lean4 community has to distribute "elaberated" #footnote("To check type equivalence, expressions are elaborated into certain normal forms via NbPE. Such an algorithm works like an interpreter that translates lambda terms into a semantic domain, evaluates it in such domain and converts them back to concrete lambda terms. The process manipulates a large amount of AST nodes in two different domains.") cache files to skip over some most time-consuming parts inside the compilation pipeline.
 
@@ -273,7 +272,7 @@ Following the convention in @aggregate-problem, aggregate data types typically r
 
 In an imperative environment, these data structures provide handy ways to store and access elements in an uniform manner with excellent locality. In the functional world, however, one cannot mutate the underlying memory objects (in user-visible ways). Otherwise, referential transparency can potentially be destroyed. Purely functional expressions are devoid of side effects. Many implementations utilize this fact to avoid repeated evaluations of the same expressions. If some memory objects referred by an expression are mutated in unexpected ways, the whole program may produce undesired results.
 
-As shown in @functional-programming, to represent state transitions, functional programs carrying aggregate state objects as the arguments to their continuation. The most safe and conservative way to update aggregate objects is to clone them in whole with required change applied and then pass newly created objects to the continuation. If there are any evaluation referring to old objects, their existing results can still be used as nothing is changed in their memory state.
+As shown in @functional-programming, to represent state transitions, functional programs carrying aggregate state objects as the arguments to their continuation. The most safe and conservative way to update aggregate objects is to clone them in whole with required change applied and then pass newly created objects to the continuation. If there are any evaluated expressions referring to old objects, their existing results can still be used as nothing is changed in their memory state.
 
 ```haskell
 addOne : Array Int -> Int -> Array Int
@@ -285,7 +284,7 @@ addOne arr idx =
 For instance, in the above code, the builtin function `set` can be implemented to allocate a new array, copying the original array with the element at the provided index modified. The performance issue is immediately apparent. Increasing all elements in a linear array becomes a $O(n^2)$ operation with additional penalty on memory management.
 
 == Solutions to the Aggregate Update Problem
-Many solutions are proposed to workaround such issues. One mitigation is to use specially designed functional data structures. The intuiation is that the "Aggregate Update Problem" only happens on "Large Objects". One can break down the data structure into small pieces thus localize the impact of modifications. Associated algorithms create updated objects with mutation happening on a small subset of the sharded pieces while reuse most unchanged parts that can be easily tracked via few pointers. Fingertrees, for example, are typically used as "arrays" in the functional world @algoxy @purely-functional-data-structures. One of their variants is adopted into the standard library of Scala with an amortized extra cost that is almost negligible under a wide range of workloads @scala-pr @rrb-vector.
+Many solutions are proposed to workaround such issues. One mitigation is to use specially designed functional data structures. The intuition is that the "Aggregate Update Problem" only happens on "Large Objects". One can break down the data structure into small pieces thus localize the impact of modifications. Associated algorithms create updated objects with mutation happening on a small subset of the sharded pieces while reuse most unchanged parts that can be easily tracked via few pointers. Fingertrees, for example, are typically used as "arrays" in the functional world @algoxy @purely-functional-data-structures. One of their variants is adopted into the standard library of Scala with an amortized extra cost that is almost negligible under a wide range of workloads @scala-pr @rrb-vector.
 
 Efficient drop-in replacements for imperative data structures may not always be available. Pointer chasing implied by large object sharding can affect cache friendliness negatively, thus introduces costs that are difficult to be amortized elegantly. More importantly, general usability demands researchers to find out a non-intrusive method, such that programmers can write functional programs in simple and productive ways without designing sophisticated ad-hoc algorithms while the compilers can produce well-optimized targets that workaround the "Aggregate Update Problem" automatically.
 
@@ -392,14 +391,14 @@ map f xs = case xs of
     let r = reuse w in Cons z zs;
     ret r
 ```
-Given a program composed with traditional IR operations (including projections, applications and constructor calls), the compiler can statically infer the required RC operations. Once explicit RC operations are obtained, more optimization opportunities are exposed to the compiler. For example, in the code above, the compiler notice that the memory associated with `xs` can possibly be reused. Hence, instead of allocating memory for constructors, a "destructive decrement" (`reset` operation) is inserted. A later on `reuse` operation can then avoid allocations if the memory pointer passed in is not null. 
+Given a program composed with traditional IR operations (including projections, applications and constructor calls), the compiler can statically infer the required RC operations. Once explicit RC operations are obtained, more optimization opportunities are exposed to the compiler. For example, in the code above, the compiler notices that the memory associated with `xs` can possibly be reused. Hence, instead of allocating memory for constructors, a "destructive decrement" (`reset` operation) is inserted. A later on `reuse` operation can then avoid allocations if the memory pointer passed in is not null. 
 
 The process proposed in @ullrich2020countingimmutablebeansreference involves three steps:
 1. Inplace update operations including `reset` and `reuse` are inserted into feasible sites.
 2. Some functions may not need to use RC pointers as they only require immutable projections or other trivial operations on their input arguments. Such functions can be converted to "borrow semantics" to avoid RC operations.
 3. With destructive operations and borrowing operations inserted, it becomes straightforward to add necessary reference counting operations.
 
-There are still other challenges such as how to tweak the functional data structures such as red-black trees to better fit into the inplace update scheme and how to efficiently maitain the reference counting in multi-threaded environments. These implementations details are discussed in @ullrich2020countingimmutablebeansreference. We skip them here to focus on the main topics.
+There are still other challenges such as how to tweak the functional data structures such as red-black trees to better fit into the inplace update scheme and how to efficiently maitain the reference counting in multi-threaded environments. These implementation details are discussed in @ullrich2020countingimmutablebeansreference. We skip them here to focus on the main topics.
 
 Lean4 is implemented based on @ullrich2020countingimmutablebeansreference. Compared with other functional language implementations including `GHC`, `ocamlopt`, `MLton`, `MLKit` and RC-managed language such as `Swift`, `Lean4` can achieve best average performance across different workloads #footnote([
   @ullrich2020countingimmutablebeansreference benchmarked binary trees, symbolic differentiation, constant folding, quick sort and red-black tree based association map.
@@ -433,7 +432,7 @@ map f xs = match xs with
     let xs' = Cons y' ys'
     return xs' 
 ```
-The `inc` and `dec` operations can be inferred automatically. Notice that we consider pattern matching as a destructive operation, after which the decrement for the corresponding RC pointers should be inserted if the object is used anymore. The above program will be annotated as the following:
+The `inc` and `dec` operations can be inferred automatically. Notice that we consider pattern matching as a destructive operation, after which the decrement for the corresponding RC pointers should be inserted if the object is not used anymore. The above program will be annotated as the following:
 ```haskell
 map f xs = match xs with
   | Nil => 
@@ -492,7 +491,7 @@ On the fastpath where `xs` holds the exclusive reference, there can be no RC ope
 == Drop-Guided Reuse Analysis
 The reuse analysis apporach can be further simplified and improved. In @perceus, the `dec` operation can be expanded in two different ways. One is to free the memory resource directly while the other one is to give out the memory resource for future reuse. The decision is made by the compiler depending on whether it finds a reuse opportunity somewhere ahead of the decrement.
 
-Such decisions, however, may not be easy to made and can degrade performance if not handled carefully. Even if memory reuse is possible, the appropriate insertion site for reuse token creation may not be trivial to determine. Consider the following nested pattern matching from @frame-limited:
+Such decisions, however, may not be easy to make and can degrade performance if not handled carefully. Even if memory reuse is possible, the appropriate insertion site for reuse token creation may not be trivial to determine. Consider the following nested pattern matching from @frame-limited:
 
 ```haskell
 match x with
@@ -524,7 +523,7 @@ match xs
     let r = reset(xs)
     Cons@r(y,Nil)
 ```
-Since the compiler wants to enforce the memory reuse, it optimistically inserts an increment operation to allow passing `xs` to subroutine `f` while postponing the destructive decrement `reset` until the return of `f`, such that the constructor call can grab the chance of inplace memory reuse. The side effect of the code motion is that `xs` is kept alive during the whole lifetime of the routine call, disabling possible reuse inside the nested functions and possibly leading to nondeterministic heap growth in the worst situation!
+Since the compiler wants to enforce the memory reuse, it optimistically inserts an increment operation to allow passing `xs` to subroutine `f` while postponing the destructive decrement `reset` until the return of `f`, such that the constructor call can grab the chance of inplace memory reuse. The side effect of the code motion is that `xs` is kept alive during the whole lifetime of the subroutine call, disabling possible reuse inside the nested functions and possibly leading to nondeterministic heap growth in the worst situation!
 
 All these issues show that looking ahead for constructor calls to decide whether or where a destructive decrement is to be installed may not be a favorable solution. This leads to the proposal from @frame-limited. 
 
@@ -548,7 +547,7 @@ With the drop-guided reuse analysis from @frame-limited, the performance is impr
   caption: [Koka benchmark data updated with drop-guided reuse analysis from @frame-limited. The benchmark was run on AMD Ryzen 5950X.]
 ) <koka-benchmark2>
 
-There are some other optimization techiniques involved in the benchmark. TRMC stands for "tail recursion modulo calculus", which provides Koka the capability to transform recursive functions in certain forms into tail recursion. FBIP stands for "functional but inplace", which is a new program paradigm proposed in @perceus. This paradigm encourages programmers to write functional programs in ways that are friendly to reuse analysis. For instance, updating and walking red-black trees can be implemented with zippers, which "linearly" hold the status of traversal and exposes more opportunities for inplace updates.
+There are some other optimization techiniques involved in the benchmark. TRMC stands for "tail recursion modulo calculus", which provides Koka the capability to transform recursive functions in certain forms into tail recursion. FBIP stands for "functional but inplace", which is a new program paradigm proposed in @perceus. This paradigm encourages programmers to write functional programs in ways that are friendly to reuse analysis. For instance, updating and walking red-black trees can be implemented with zippers, which "linearly" hold the status of traversal and expose more opportunities for inplace updates.
 
 The key takeaway for these benchmark results is that reuse analysis empowers functional languages with competitive performance to imperative programming by implicitly allowing inplace updates. Such technique largely improves the performance under workloads that are conventionally considered hard for functional languages such as data structure maintainence.
 
@@ -707,11 +706,11 @@ _start: {
 }
 ```
 
-However, there are several issues stop `add1` from being vectorized. The first problem is that, along the loop, there are two `lean_dec` operation. This is because loop index variables can be potentially boxed in Lean. Such operations can be eliminated with a better design of value-based types.
+However, there are several issues stop `add1` from being vectorized. The first problem is that, along the loop, there are two `lean_dec` operation. This is because loop index variables can be potentially boxed in Lean4. Such operations can be eliminated with a better design of value-based types.
 
 The other problem is more fundamental and difficult to resolve. The array updating functions such as `lean_float_array_fset` and `lean_float_array_fget` are implemented with inplace mutability support. We have learned such operations incur a check on exclusivity and a potential slow path that clones the underlying data. Vectorizer cannot conduct optimizations due to the existence of these cold routines.
 
-We hope to examine whether we can hoist the loop invariant exclusivity out of the tight loop body as demonstrated in @loop-hosting. This should be doable by lifting out the exclusivity check together with the first iteration and then continue with the remaining iterations with checking and cloning eliminated. Such operation introduces loop structures other than tail recursion into functional IR, which can affect other optimizations.
+We hope to examine whether we can hoist the loop invariant exclusivity check out of the tight loop body as demonstrated in @loop-hosting. This should be doable by lifting out the exclusivity check together with the first iteration and then continue with the remaining iterations with checking and cloning eliminated. Such operation introduces loop structures other than tail recursion into functional IR, which can affect other optimizations.
 One needs to carefully arrange such passes.
 
 #figure(
@@ -727,17 +726,17 @@ This introduces another opportunity that is not yet examined in existing impleme
 
 == Unified Framework in MLIR
 
-The last point is more of practical values. Different forms of reuse analysis is used in both Lean4 and Koka without a unified playground similar to the MMTk project for the Garbage Collection Community @1317436. We hope to build up a framework with MLIR, as it provides handy dataflow analysis framework. The structured high-level operations can also be helpful when solving problems such as loop invariant hoisting. Being multi-leveled, once our IR framework is implemented, it immediately become available for others to utilize. Similarly, we may also benefit from the existing `linalg` and `tensor` dialect if we want to expose linear algebra features to our functonal languages.
+The last point is more of practical values. Different forms of reuse analysis are used in both Lean4 and Koka without a unified playground similar to the MMTk project for the Garbage Collection Community @1317436. We hope to build up a framework with MLIR, as it provides handy dataflow analysis framework. The structured high-level operations can also be helpful when solving problems such as loop invariant hoisting. Being multi-leveled, once our IR framework is implemented, it immediately become available for others to utilize. Similarly, we may also benefit from the existing `linalg` and `tensor` dialect if we want to expose linear algebra features to our functonal languages.
 
 = Conclusions
 
-For functional programming, immutability is like a black chocolate, tasty but sometimes bitter. The referential transparency enforced by immutability simplifies analysis and enables various optimizations. However, it also forbids most updates to happen inplace and makes many easy and efficient imperative patterns become complicated and costly in the functional world. We have covered such scenarios in @functional-programming.
+For functional programming, immutability is like a black chocolate, tasty but sometimes bitter. The referential transparency enforced by immutability simplifies analyses and enables various optimizations. However, it also forbids most updates to happen inplace and makes many easy and efficient imperative patterns become complicated and costly in the functional world. We have covered such scenarios in @functional-programming.
 
 In this survey, we have delved into the studies attempting to solve the performance penalty of immutability without breaking it in visible ways. Traditional solutions utilizes static analysis and RC-encoded runtime information to capture the exclusivity of objects and thus enabling inplace updates without breaking the referential transparency assumptions of functional languages.
 
 Recent progress on RC-based reuse analysis figures out that reference count not only carries out the exclusivity in runtime but the associated operations such as decrement also provide precise spots where static analysis can kick in
 to reduce overhead and capture memory reuse or inplace update opportunities. The simplicity of RC runtime also enables efficient wrappers that manipulate imperative data structures in functional ways.
 
-There is still plenty room to improve with inplace update optimizations. In the last part of the survery, we listed some potential solutions to allow local mutability in RC runtime without pollute its simplicity, reduce RC checking overhead in tight loops to enable vectorization, and further reduce heap allocations with stack promotion.
+There is still plenty room to improve with inplace update optimizations. In the last part of the survey, we listed some potential solutions to allow local mutability in RC runtime without pollute its simplicity, reduce RC checking overhead in tight loops to enable vectorization, and further reduce heap allocations with stack promotion.
 
 High-performance functional language implementation is becoming increasingly important for various communities. We believe further improvements on the reuse analysis hold significant values for both academic research and industrial applications, enhancing the efficiency and effectiveness of functional programming languages and delivering better development experience.
