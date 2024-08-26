@@ -39,27 +39,27 @@
 
 = Introduction
 
-Functional programming, as its name suggests, allows users to compose their programs in a way that is similar to mathematical functions. The ability to present programs similar to mathematical expressions lies in the immutable nature of functional programming. Such programming paradigm has several advantages. For instance, immutability implies race free in the context of parallel programming. The straightforward control flows and immutable assumptions of functional programs largely simplifies many advanced static analyses, optimizations and program verifications.
+This survery tries to bring together two seemingly exclusive concepts: *inplace mutations* and *immutable objects*. Immutable objects have been introduced into various languages due to their inherent memory safety and friendliness to static analyses @rust-affine @ullrich2020countingimmutablebeansreference @Verona. Functional languages, for example, can utilize the referential transparency implied by immutability to avoid repetitious evaluation. Rust and other memory-safe languages apply immutability to shared and concurrent objects to ensure soundness of memory operations.
 
-Despite its elegance, functional programming also has its downsides. Immutability appears to be a double-edged sword. Many data structures and algorithms are complicated to implement in functional paradigm. Some may even be impossible to maintain its original efficiency when written in a purely functional style. Performance for general situations in functional languages may also be affected as it is no longer possible to apply inplace updates. Objects often need to be frequently constructed or destroyed in whole even though a state change only touchs partial fields.
+Despite its elegance, immutability appears to be a double-edged sword. As for functional programming, many data structures and algorithms are complicated to implement in functional paradigm. Some may even be impossible to maintain its original efficiency when written in a purely functional style devoid of any inplace mutation. Performance for general situations may also be affected as it is no longer possible to apply inplace updates. Objects often need to be frequently constructed or destroyed in whole even though a state change only touchs partial fields.
 
-This survery wants to explore solutions to these problems. By studying exsiting works, we hope to answer two big questions regarding functional programming:
+This survery wants to explore solutions to these problems. By studying exsiting works, we hope to answer two big questions regarding immutable objects:
 
-1. *Is it possible to achieve inplace mutability as in imperative programming while keeping the program in functional paradigm?* If this is possible, what efforts are needed for runtime and static analysis?
+1. *Is it possible to achieve inplace mutability without breaking the "immutable views" of objects?* If this is possible, what efforts are needed for runtime and static analysis?
 
-2. *Is it possible to interpolate between functional and imperative programming without breaking the immutable views of functional programs?* Does such interpolation require extra efforts from programmers?
+2. *Is it possible to interpolate objects from both mutable and immutable worlds?* Does such interpolation require extra efforts from programmers?
 
-In order to answer these questions, we arrange the survery in the following structure:
+In order to answer these questions, we arrange the survey in the following structure:
 
-- @functional-programming will introduce some basic backgrounds of functional programming and common design patterns. We will be able to see when and why immutability are causing problems.
+- @functional-programming will introduce some basic backgrounds of functional programming and common design patterns on immutable objects. We focus on functional programming as immutability is heavily employed in such paradigm. We will be able to see when and why immutability is causing problems.
 
-- @early-story will summarize traditional methods to handle such immutability issues. This chapter mainly includes two aspects: 1) the definition of *large object* and *aggregate update* problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions in functional languages.
+- @early-story will summarize traditional methods to handle such immutability issues. This chapter mainly includes two aspects: 1) the definition of *large object* and *aggregate update* problems in functional programming and their solutions; 2) how sophisticated memory managment algorithms mitigate performance panelty due to frequent object constructions and destructions due to immutability.
 
-- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based on *reuse analysis*. This chapter will discuss runtime facilities and static analysis required by efficient memory reuse. We will not only see that RC-based approaches break the common belief on the heavy overhead of RC maintainense but also see how RC operations themselves provide precise cut-in points for static analysis. Besides solving the inplace update problem, it also explains why reference counting (RC) based runtime enables a straightforward way to wrap imperative data structures into functional programs.
+- @RC-Revisit continues on exploring the solutions but focusing on some newly developed methods based on *reuse analysis*. This chapter will discuss runtime facilities and static analysis required by efficient memory reuse. We will not only see that RC-based approaches break the common belief on the heavy overhead of RC maintainance but also see how RC operations themselves provide precise cut-in points for static analysis. Besides solving the inplace update problem, it also explains why reference counting (RC) based runtime enables a straightforward way to wrap imperative data structures into functional programs.
 
-- @related-works summarizes similar works related to reuse analysis in @RC-Revisit. It also lists advantages and shortcomings with these solutions. 
+- @related-works summarizes similar works related to reuse analysis in @RC-Revisit. This chapter includes both high-level type system design and similar analyses outside reference-counted system. Issues surrounding immutable objects can be further generalized to any singly-assigned values that demand certain resources. For instance, it is common for machine learning frameworks to compose tensor expressions. The buffers holding intermediate tensors must be appropriately optimized to avoid premature materialization. We will see how MLIR's bufferization pipeline eliminates and fuses temporary buffers.
 
-- @future-works  will propose potential improvements to the reuse analysis and provide a detailed discussion on implementation difficulties.
+- @future-works  will propose potential improvements to the reuse analysis and provide a detailed discussion on implementation difficulties. There are still many missing pieces in existing works, such as how to minimize the impact of the reference count checking on fastpaths, the codesign of mutable and immutable regions, and the locality implication of memory reuse. We hope to offer a glance at these opportunities in this chapter. 
 
 = Functional Programming <functional-programming>
 
@@ -101,7 +101,7 @@ balance color l k r = Node color l k r
 ```
 ]
 
-Consider the functional red-black tree balancing algorithm implemented by @algoxy. The implementation uses pattern matching syntax in Haskell. On the left-hand side, the functions check if the arguments conforming certain patterns. If a match is found, balanced nodes on the right-hand side are constructed as return values using matched values from left-hand side. Implicitly, such procedure indicate the arguments on the left-hand side can be destructed if there is no further reference to these values after execution. The right-hand side nodes are newly constructed, hence demand allocations. One can imagine that the functional implementation may lead to much more performance penalty due to the "immutable nature" of the paradigm.
+Consider the functional red-black tree balancing algorithm implemented by @algoxy. The implementation uses pattern matching syntax in Haskell. On the left-hand side, the function checks if the arguments conforming certain patterns. If a match is found, balanced nodes on the right-hand side are constructed as return values using matched values from left-hand side. Implicitly, such procedure indicate the arguments on the left-hand side can be destructed if there is no further reference to these values after execution. The right-hand side nodes are newly constructed, hence demand allocations. One can imagine that the functional implementation may lead to much more performance penalty due to the "immutable nature" of the paradigm.
 
 == The Demands for Performance
 
@@ -262,7 +262,7 @@ One can infer from the profiling data that 1) compilation time is a big concern 
 
 // #reuse-section
 
-= Aggregate Update in Functional Programming: An Early Story <early-story>
+= Inplace Update in Functional Programming: An Early Story <early-story>
 
 Unique properties including referential transparency has been attracting people from various communities to introduce functional languages into their research and production environments. As such, a primary challenge is to workaround the performance issues implied by immutability. In this chapter we focus on summarizing different approaches to tackle the so called "Aggregate Update Problem" (also known as "Large Object Problem") in functional programming environments.
 
@@ -586,7 +586,10 @@ collect x acc = collect (x - 1) (vec_push acc x)
 In this chapter, we have examined how inplace mutation is achieved via RC-oriented optimizations. Contrary to traditional belief that RC can introduce maintainence overhead over fastpaths, @ullrich2020countingimmutablebeansreference @perceus @frame-limited iterate the reuse analysis algorithm and achieve no extra cost other than the necessary check of exclusivity. With @frame-limited, reuse analysis can even be used to avoid nondeterministic heap growth that can happen in both functional and imperative environment. Compared with previous solutions to the "Aggregate Update Problem", the RC-based solution is beneficical for both large and small objects and does not require manual selection of fixed operations. Compared with other performant GC methods, RC has a minimal runtime requirement which enables a shameless way to interpolate between functional and imperative world.
 
 = Related Works <related-works>
-In the previous chapter, we have seen RC-based memory reuse approaches with combined static analysis and runtime support. In this chapter, we hope to enhance the understanding of these approaches by covering more related works and studying their advantages and limitations over the RC-based approach.
+In the previous chapter, we have seen RC-based memory reuse approaches with combined static analysis and runtime support. In this chapter, we hope to enhance the understanding of these approaches by covering more related works and studying their advantages and limitations over the RC-based approach. There are two kinds of related works covered in this chapter:
+
+1. We first discuss the linear type systems that explicity grant languages with the inplace mutation capabilities without static analysis. RC-based reuse analysis is related to this approach in the sense that even though the managed objects can be shared, the ownership is now passed linearly with move semantic.
+2. We generalize the immutability problem to singly-assigned values and study how the MLIR's bufferization pipeline reuse existing buffers to avoid unnecessary materialization of tensor values.
 
 == Linear Types can Change the World
 In programming languages, linearity typically refer to the properties that a data of certain type can and must be used once @LinearUnique. The destructive move semantic in Rust mimics the affine linearity in the sense that an object is either moved (used) or dropped#footnote("Cloning an object creates a new object without consuming the original one. Both the original object and the newly cloned ones still conform the affine linearity.").
@@ -600,7 +603,7 @@ The downside of the approach is more on ergonomics. Linear types and normal type
 Haskell introduces linearity into its type system since GHC 9.10. @linear-haskell provides a detailed discussion on the design of the linearity in Haskell, including optimizations and ergonomics. For example, they use a notion of "linear arrows" to partially allow reusing code pieces with different colors. 
 
 == Bufferization in MLIR
-There are many situations where allocations and deallocations can be treated as internal operations of the language construction. For example, since C++20 @cpp, the standards allow C++ to rearrange, group and cancel `new` and `delete` operations. On one hand, this allows "constant evaluation" to get rid of memory operations. On the other hand, this opens opportunities for further optimizations.
+There are many situations where allocations and deallocations can be treated as internal operations of the language construction. For example, since C++14 @cpp, the standards allow C++ to rearrange, group and cancel `new` and `delete` operations. On one hand, this allows "constant evaluation" to get rid of memory operations. On the other hand, this opens opportunities for further optimizations.
 
 Another important example in practice is the bufferization pipeline inside MLIR @Bufferization @MLIR. MLIR stands for Multi-Level Intermediate Representation. It allows users to compose different dialects in a unified IR framework and utilize existing facilities from those dialects together. `linalg` is one of the dialects, which provide functionalities to reason about linear algebra operations.
 
@@ -622,11 +625,13 @@ There are two situations for the empty buffer removal:
 
 Compared with the RC-based reuse analysis, the bufferization pipeline is also reasoning about the passing of memory resource. However,
 1. bufferization is more focused on the temporary buffers created around the computation#footnote("There are options to make bufferization pipeline go beyond the function boundaries but they do not change the affect that the fact that empty buffer elimination only focus on locally created buffers."). Reuse analysis, on the contrary, is based on analyzing potential exclusivity that may not be locally decided within current call frame.
-2. bufferization mainly operates on allocations and deallocations. The optimizations does not involve the maintainence of reference count.
-3. bufferization eliminates allocations if the associated buffer is materialized explicitly to memory locations that is available at the time of computation while the frame-limited reuse analysis is about paring memory tokens available within the context to allocation sites.
+
+2. bufferization mainly operates on allocations and deallocations. The optimizations does not involve the maintainence of reference count, hence it is not using the liveness information as encoded in the `inc/dec` operations.
+
+3. bufferization eliminates allocations if the associated buffer is materialized explicitly to memory locations that is available at the time of computation while the frame-limited reuse analysis is about paring memory tokens available within the context to allocation sites. The latter requires more analysis along the control flow.
 
 = Future Works <future-works>
-Reuse analysis is developed with the persuit of performance and simplicity. However, RC-based approach is not without its limitations. In this chatper, we take a brief review of remaining issues and possible solutions.
+Reuse analysis is developed with the persuit of performance and simplicity. However, RC-based approach is not without its limitations. In this chatper, we take a brief review of remaining issues and possible solutions. We hope to offer a glance at possible future development related to the inplace mutation of immutable objects. 
 
 == Cyclic References and Local Mutability
 
@@ -637,9 +642,37 @@ A major issue of RC is that it cannot reclaim memory blocks with cyclic referenc
   caption: [Mutually referenced objects.]
 ) <mutual-reference>
 
-It is worth noting that this is usually not a problem in functional languages. Functional data structures are inductively or co-inductively defined @Pfenning2018. Without mutability, there is no possibility to form cycles among functional objects. However, functional languages are not always pure -- OCaml, Scala, Lisp and many other common implementations all provide mutable references locally or even globally.
+It is worth noting that this is usually not a problem in functional languages. Functional data structures are inductively or co-inductively defined @Pfenning2018. Without mutability, it is not possibile to form cycles among functional objects. However, even functional languages are not always pure -- OCaml, Scala, Lisp and many other common implementations all provide mutable references locally or even globally.
 
-Project Verona @Verona @parkinson2024reference is another project utilizing RC-managed objects in its language runtime. Project Verona studies scheduling tasks safely and efficiently with concurrency. As such, the language design contains mutable and immutable regions @parkinson2024reference. When a RC-managed object escapes from a locally mutable area, a "freeze" operation will be applied and make the associate object immutable. As cycles may form inside the mutable region, the freezing procedure is designed to collect objects into multiple SCCs (Strongly Connected Components). While the reference count is recorded in the designated representative object, all other objects in the SCC tracks their path to the representative in a union-find manner. This information can be maintained by pointer tagging hence implies negligible overhead#footnote[To track the allocated objects in a region, one can maitain a singly-linked list with another extra word inside the object header.].
+Project Verona @Verona @parkinson2024reference is another project utilizing RC-managed objects in its language runtime. Project Verona studies scheduling tasks safely and efficiently with concurrency. As such, the language design contains mutable and immutable regions @parkinson2024reference. Workers construct desired objects by scheduling jobs in locally mutable regions and then submit them into globally shared environment. As shared environment can be accessed by threads in parallel, mutations are no longer permitted.
+
+To achieve such transition, when a RC-managed object escapes from a locally mutable area, a "freeze" operation will be applied and make the associate object immutable. As cycles may form inside the mutable region, the freezing procedure is designed to collect objects into multiple SCCs (Strongly Connected Components). While the reference count is recorded in the designated representative object, all other objects in the SCC tracks their path to the representative in a union-find manner. This information can be maintained by pointer tagging hence implies negligible overhead#footnote[To track the allocated objects in a region, one can maitain a singly-linked list with another extra word inside the object header.].
+
+```ml
+(*sample code taken from verona-rt*)
+let freeze (r) =
+  pending = empty_stack
+    let rec freeze_inner(x) =
+      match rep(x).status with
+      | UNMARKED =>
+        x.status = PENDING(0);
+        pending.push(x);
+        for each f in x
+          freeze_inner(x.f)
+        if (pending.peek() == x)
+          pending.pop()
+          rep(x).status = RC(1);
+
+      | PENDING(N) =>
+        while (union(x, pending.peek()))
+          pending.pop()
+
+      | RC(N) =>
+          x.status = RC(N+1)
+  freeze_inner (r)
+```
+
+To some extend, inplace mutation problem has similar characteristics of race-free mutations in concurrent programming. Such mutations are permissible if and only if the mutator holds the exclusive access to the underlying memory locations. Hence, the idea of having local mutable regions can be ported to general settings outside concurrent programming, as long as we clear isolation between mutation and immutable sections.
 
 We hope to practice this idea in functional programming. A mutable region, can be abstracted as a monad or a function with certain algebraic effect. When taking out the value from a mutable region, the freezing operation can be performed. 
 
@@ -656,7 +689,9 @@ let a = region {
 ```
 Should we allow outer-scope mutable objects to permeate into nested regions? The answer should be no. If such object is scanned by the inner freezing operation, it will be marked as frozen. However, as the outer scope still holds the mutable reference, its data can be altered. Hence, we may not allow mutable regions to be directly nested. Rather, they should be segmentated and the unfrozen objects in different regions should be isolated. This indicates that some efforts are needed to design a sound type system to allow local mutability with the global immutable RC-runtime.
 
+We find the idea particularly interesting because it has minimal runtime implications. One can introduce freezable and nonfreezing RC into the language to enable local mutability without dealing with complicated GC or different memory models. As we have discussed before, having such a minimal runtime will provide an easy mechanism to interpolate between the mutable and immutable worlds.
 == Loop Carried Exclusivity
+On the fastpaths with memory reuse, the RC-based approach can eliminate almost all overhead due to memory management. However, in some scenarios, the checking and branching remain to be  problematic.
 
 The following Lean4 code adds $1.0$ to all elements inside a `FloatArray` that stores elements in a fixed size contiguous memory area. 
 
@@ -728,15 +763,35 @@ This introduces another opportunity that is not yet examined in existing impleme
 
 The last point is more of practical values. Different forms of reuse analysis are used in both Lean4 and Koka without a unified playground similar to the MMTk project for the Garbage Collection Community @1317436. We hope to build up a framework with MLIR, as it provides handy dataflow analysis framework. The structured high-level operations can also be helpful when solving problems such as loop invariant hoisting. Being multi-leveled, once our IR framework is implemented, it immediately become available for others to utilize. Similarly, we may also benefit from the existing `linalg` and `tensor` dialect if we want to expose linear algebra features to our functonal languages.
 
+An interesting point to explore is whether the reuse analysis can be reformulated to a dataflow problem. Each drop operation adds in assignable tokens to the context while each allocation may consume such tokens. This assembles the generating and killing sets in iterative dataflow analysis (IDFA). In functional programming, the control flow graphs are of DAG forms. Therefore, there is no need to solve the problem with IDFA. Internalizing RC operations, however, should not be restricted to functional programming, but one may need to think about implications of complex dataflows. The bufferization pipeline discussed above may provide hints on implementations but the memory reuse tokens are "nullable" so when joining them across different flows, it may be harder to keep track of the best assignment that maximize the possibility of successful reuse.
+
+== Locality Implications of Memory Reuse
+
+At a high-level perspective, memory reuse via RC can potentially reduce the amount of memory blocks that a program needs to access as memory resource is directly handed over to newly allocated objects when feasible. Since the amount of memory corelates with the working set size, we should be able to see its effect on locality.
+
+However, there is no existing quantitive study on how reuse analysis affects the locality of programs. There are several difficulties when applying locality analysis to the scenario of memory reuse:
+- Memory reuse is nondeterministic. The resource handover only happens if the object reference is exclusive. One may need to introduce a probability model to reason about the locality implications of reused memory blocks.
+- Static locality analysis generally favors regular access patterns, such as array and matrices, while reuse analysis may handle large or small objects with different levels of connectivity among them.
+- The exact relation between reuse likelihood and locality can be complicated. Having heavily shared objects may reduce the working set size and the chance of reuse in the same time.
+
+As RC-managed runtime is widely used in many applications including some programs that are sensitive to performance, characterizing how reuse analysis affect the cache behavior can be an interesting point for further exploration. Whether memory blocks can be mostly reused or not will differ the working set size of programs. Hence, reuse analysis establish a connection between the complexity of the references among objects and the locality metrics of the programs, which provides a new perspective for future research.
+
+== Security Implications of Memory Reuse
+To reduce overhead of reference counting, reuse analysis further differentiate the fastpaths and slowpaths. As such optimization is applied implicity by the compiler, programs may exhibit different behaviors in uncontrolled ways. 
+
+For example, by monitoring allocation frequency, one may be able to tell whether a program is updating a sparse data structure or a dense one. Such differences may lead to further information leakage. Unlike GC or other deferred approaches, RC-based memory reclamation happens timely, which gives more opportunities for observers to infer the information out of the running programs.
+
+Currently, reuse analysis is still being adopted into various languages. If there is any security-critical program to be implemented with reuse analysis, one may need to study how to mask certain allocation patterns by probabilistically reject a reuse opportunity. There may be tradeoff between the performance and the security.
+
 = Conclusions
 
-For functional programming, immutability is like a black chocolate, tasty but sometimes bitter. The referential transparency enforced by immutability simplifies analyses and enables various optimizations. However, it also forbids most updates to happen inplace and makes many easy and efficient imperative patterns become complicated and costly in the functional world. We have covered such scenarios in @functional-programming.
+For programming languages, immutability is like a black chocolate, tasty but sometimes bitter. The referential transparency enforced by immutability simplifies analyses and enables various optimizations. However, it also forbids most updates to happen inplace and makes many easy and efficient mutable design patterns become complicated and costly in the immutable world. We have covered such scenarios in @functional-programming.
 
-In this survey, we have delved into the studies attempting to solve the performance penalty of immutability without breaking it in visible ways. Traditional solutions utilizes static analysis and RC-encoded runtime information to capture the exclusivity of objects and thus enabling inplace updates without breaking the referential transparency assumptions of functional languages.
+In this survey, we have delved into the studies attempting to solve the performance penalty of immutability without breaking it in visible ways. Traditional solutions utilizes static analysis and RC-encoded runtime information to capture the exclusivity of objects and thus enabling inplace updates without breaking the referential transparency assumptions.
 
-Recent progress on RC-based reuse analysis figures out that reference count not only carries out the exclusivity in runtime but the associated operations such as decrement also provide precise spots where static analysis can kick in
+Recent progress on RC-based reuse analysis figures out that reference counting not only carries out the exclusivity in runtime but also provides precise spots where static analysis can kick in
 to reduce overhead and capture memory reuse or inplace update opportunities. The simplicity of RC runtime also enables efficient wrappers that manipulate imperative data structures in functional ways.
 
-There is still plenty room to improve with inplace update optimizations. In the last part of the survey, we listed some potential solutions to allow local mutability in RC runtime without pollute its simplicity, reduce RC checking overhead in tight loops to enable vectorization, and further reduce heap allocations with stack promotion.
+There is still plenty room to improve with inplace update optimizations. In the last part of the survey, we have listed some potential solutions to allow local mutability in RC runtime without pollute its simplicity, reduce RC checking overhead in tight loops to enable vectorization, and further reduce heap allocations with stack promotion. Locality and security implications demand further investigations.
 
-High-performance functional language implementation is becoming increasingly important for various communities. We believe further improvements on the reuse analysis hold significant values for both academic research and industrial applications, enhancing the efficiency and effectiveness of functional programming languages and delivering better development experience.
+High-performance functional language implementation is becoming increasingly important for various communities. In the meanwhile, functional features such as immutable objects are adopted into more and more languages. We believe further improvements on the reuse analysis hold significant values for both academic research and industrial applications, enhancing the efficiency and effectiveness of immutable object management and delivering better development experience.
