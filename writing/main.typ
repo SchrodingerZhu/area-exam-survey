@@ -59,11 +59,11 @@ In order to answer these questions, we arrange the survey in the following struc
 
 - @related-works summarizes similar works related to reuse analysis in @RC-Revisit. This chapter includes both high-level type system design and similar analyses outside reference-counted system. Issues surrounding immutable objects can be further generalized to any singly-assigned values that demand certain resources. For instance, it is common for machine learning frameworks to compose tensor expressions. The buffers holding intermediate tensors must be appropriately optimized to avoid premature materialization. We will see how MLIR's bufferization pipeline eliminates and fuses temporary buffers.
 
-- @future-works  will propose potential improvements to the reuse analysis and provide a detailed discussion on implementation difficulties. There are still many missing pieces in existing works, such as how to minimize the impact of the reference count checking on fastpaths, the codesign of mutable and immutable regions, and the locality implication of memory reuse. We hope to offer a glance at these opportunities in this chapter. 
+- @future-works  will propose potential improvements to the reuse analysis and provide a detailed discussion on implementation difficulties. There are still many missing pieces in existing works, such as how to minimize the impact of the reference count checking on fastpaths, the codesign of mutable and immutable regions, and the locality and security implication of memory reuse. We hope to offer a glance at these opportunities in this chapter. 
 
 = Functional Programming <functional-programming>
 
-Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the β-reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
+Functional programming is typically associated with a paradigm that formulates programs as lambda expressions and views computation as the reduction or normalization of lambda terms. In a purely functional framework, evaluations are devoid of side effects, allowing programs to be regarded as "functions" in the mathematical sense @pragmatics. This approach to programming simplifies the handling of complex problems: values are inherently persistent and sharable @advanced-data-structures @optimal, immutability prevents data races in concurrent programming, and lambda calculus embodies the core of constructive proofs according to @proofs-as-programs.
 
 == State Transitions in Functional Programming
 Being immutable, however, functional paradigm has its negative implications to performance. Consider the State Monad implementation in Haskell from MTL @mtl @state-monad. Without the capability to mutate individual field, the state transition is achieved by constructing new state objects and passing it to the desired continuation (the lambda expression wrapped in `state` constructors). If the code were not properly optimized, each of such state transitions is accompanied by deallocations of original state objects, allocations of new state objects, and necessary data copying. This will lead to considerable performance impacts especially when such objects are large enough. 
@@ -101,7 +101,7 @@ balance color l k r = Node color l k r
 ```
 ]
 
-Consider the functional red-black tree balancing algorithm implemented by @algoxy. The implementation uses pattern matching syntax in Haskell. On the left-hand side, the function checks if the arguments conforming certain patterns. If a match is found, balanced nodes on the right-hand side are constructed as return values using matched values from left-hand side. Implicitly, such procedure indicate the arguments on the left-hand side can be destructed if there is no further reference to these values after execution. The right-hand side nodes are newly constructed, hence demand allocations. One can imagine that the functional implementation may lead to much more performance penalty due to the "immutable nature" of the paradigm.
+Consider the functional red-black tree balancing algorithm implemented by @algoxy. The implementation uses pattern matching syntax in Haskell. On the left-hand side, the function checks if the arguments conforming certain patterns. If a match is found, balanced nodes on the right-hand side are constructed as return values using matched values from left-hand side. Implicitly, such procedure indicates the arguments on the left-hand side can be destructed if there is no further reference to these values after execution. The right-hand side nodes are newly constructed, hence demand allocations. One can imagine that the functional implementation may lead to much more performance penalty due to the "immutable nature" of the paradigm.
 
 == The Demands for Performance
 
@@ -111,7 +111,7 @@ Before we move on to the solutions, let's answer the following questions:
 
 In order to answer these questions, let's conduct an experiment on the Lean4  @lean-4 proof assistant. Lean4 and other dependently-typed functional programming languages are attracting increasingly more interests among cryptography, certified compilation and mathematics community. Compiler researchers and cryptography researchers are using them to verify critial programs @composable-verification @cryptoeprint. Mathematicians are embedding proof assistants into their workflows to tackle some most challenging works such as formalizing proofs to the Fermat's Last Theorem for regular primes @flt.
 
-For proof assistants, their type systems are rather complicated, which usually require bidirectional type checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and NbPE @NbPE techniques on a relatively large ruleset. Many proof assistants choose to bootstrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
+For proof assistants, their type systems are rather complicated, which usually require Bidirectional Type Checking @pi-forall @how-to-implement-ddt @how-to-code-your-own-type-theory and Normalization by Partial Evaluation (NbPE) @NbPE techniques on a relatively large ruleset. Many proof assistants choose to bootstrap themselves @lean-4 @agda. On one hand, the type checking rules can be closely represented in functional programming as the rules are typically described in typed lambda calculus. On the other hand, doing so provides a measure for these proof asisstants to assess their own correctness. The type checking algorithms mentioned above exhibits the common patterns of functional programming and thus affected by the performance implications. 
 
 `mathlib4` @mathlib4 is a community driven project to formalize as much as mathematics with Lean4. As the project grows bigger and bigger, compilation time (dominated by type checking mathematical theorems) becomes increasingly concerning. There are $4886$ targets inside the project up to the time of access. Due to the long time of compilation, Lean4 community has to distribute "elaberated" #footnote("To check type equivalence, expressions are elaborated into certain normal forms via NbPE. Such an algorithm works like an interpreter that translates lambda terms into a semantic domain, evaluates it in such domain and converts them back to concrete lambda terms. The process manipulates a large amount of AST nodes in two different domains.") cache files to skip over some most time-consuming parts inside the compilation pipeline.
 
@@ -264,7 +264,7 @@ One can infer from the profiling data that 1) compilation time is a big concern 
 
 = Inplace Update in Functional Programming: An Early Story <early-story>
 
-Unique properties including referential transparency has been attracting people from various communities to introduce functional languages into their research and production environments. As such, a primary challenge is to workaround the performance issues implied by immutability. In this chapter we focus on summarizing different approaches to tackle the so called "Aggregate Update Problem" (also known as "Large Object Problem") in functional programming environments.
+Unique properties including referential transparency has been attracting people from various communities to introduce functional programming into their research and production environments. As such, a primary challenge is to workaround the performance issues implied by immutability. In this chapter we focus on summarizing different approaches to tackle the so called "Aggregate Update Problem" (also known as "Large Object Problem") in functional programming environments.
 
 == What is the "Aggregate Update Problem"?
 
@@ -420,7 +420,7 @@ Unlike C/C++, Rust @rust-affine programming language defaults to destructive mov
 It is arguable that move semantic is more beneficial in the management of RC objects. It solves the issue of holding of the RC pointers uselessly. In functional programming, however, we normally don't expect an expression to become inaccessible after its first usage#footnote("We will discuss about linearity very soon."). However, it is analyzable whether a value will be used again after a move. Hence, it is possible to default on moving the RC ownership while inserting necessary clone operation on need.
 
 === Reuse Analysis under Destructive Move
-In @ullrich2020countingimmutablebeansreference, the algorithms begins with inserting `reset` and `reuse`. With destructive move, the steps are reordered in @perceus. Given a spartan lambda algebra, one can first insert the `inc` and `dec` operations in the first step, assuming move semantics. Notice that the reference count can now be decreased as soon as its associated pointer is no longer used anywhere in current frame.
+In @ullrich2020countingimmutablebeansreference, the algorithms begins with inserting `reset` and `reuse`. With destructive move, the steps are reordered in @perceus. Given a spartan lambda algebra, one can first insert the `inc` and `dec` operations in the first step, assuming move semantics. Notice that the reference count can now be decreased as soon as its associated pointer is no longer used anywhere in the current frame.
 
 For instance, consider following program:
 ```haskell
@@ -527,7 +527,7 @@ Since the compiler wants to enforce the memory reuse, it optimistically inserts 
 
 All these issues show that looking ahead for constructor calls to decide whether or where a destructive decrement is to be installed may not be a favorable solution. This leads to the proposal from @frame-limited. 
 
-It is suggested that the compiler should not distinguish the decrement in two different operations. Similar to the first step analysis in @perceus, `inc/dec` operations are inserted without the consideration of reuse. The `dec` operation denotes that some memory resource possibility becomes available within the context. We can do a backward dataflow analysis to populate possible allocations along the control flow. We carry the possibly available "resource" along the CFG, until it is paired with a suitable allocation at a contructor call or we no longer find any feasible allocation along the control flow. In the latter, we insert an explicit free operation of the memory resource. Another way to think about the algorithm is that we always insert a destructive decrement instead of normal `dec` and insert free if it is not paired with any reuse operation.
+It is suggested that the compiler should not distinguish the decrement in two different operations. Similar to the first step analysis in @perceus, `inc/dec` operations are inserted without the consideration of reuse. The `dec` operation denotes that some memory resource possibably becomes available within the context. We can do a backward dataflow analysis to populate possible allocations along the control flow. We carry the possibly available "resource" along the CFG, until it is paired with a suitable allocation at a contructor call or we no longer find any feasible allocation along the control flow. In the latter, we insert an explicit free operation of the memory resource. Another way to think about the algorithm is that we always insert a destructive decrement instead of normal `dec` and insert free if the produced memory token is not paired with any reuse operation.
 
 In the situation of nested reuse, the new approach automatically "push down" the decrement operation into branches. In the situation where subroutine calls consuming a RC-managed object, the `dec` operation will not be inserted in the first place, hence the issues caused by deferred memory release no longer exist. The new approach has a nice "frame-limited" property: if the associate memory of a managed object should be released within the current frame with the decrement to its last reference count, its lifespan will not overlap with subroutine calls after the decrement. Such property is not obstructed by the code motion to achieve possible memory reuse. In other words, the timeliness of RC operations are garanteed.
 
@@ -624,11 +624,11 @@ There are two situations for the empty buffer removal:
 - The output buffer of the computation is explicitly materialized in a destination that is available at the time of computation. As such, the destination memory resource can be directly utilized without allocating any new buffer.
 
 Compared with the RC-based reuse analysis, the bufferization pipeline is also reasoning about the passing of memory resource. However,
-1. bufferization is more focused on the temporary buffers created around the computation#footnote("There are options to make bufferization pipeline go beyond the function boundaries but they do not change the affect that the fact that empty buffer elimination only focus on locally created buffers."). Reuse analysis, on the contrary, is based on analyzing potential exclusivity that may not be locally decided within current call frame.
+1. bufferization is more focused on the temporary buffers created around the computation#footnote("There are options to make bufferization pipeline go beyond the function boundaries but they do not change the affect that the fact that empty buffer elimination only focus on locally created buffers."). Reuse analysis, on the contrary, is based on analyzing potential exclusivity that may not be locally decided within current call frame. The release of RC gives out the memory resource nondeterministically, where the buffer resource is deterministic in bufferization pipeline.
 
-2. bufferization mainly operates on allocations and deallocations. The optimizations does not involve the maintainence of reference count, hence it is not using the liveness information as encoded in the `inc/dec` operations.
+2. bufferization mainly operates on allocations and deallocations of tensors. The optimizations does not involve the maintainence of reference count, hence it is not using the liveness information as encoded in the `inc/dec` operations. It also involves no fusion on such operations.
 
-3. bufferization eliminates allocations if the associated buffer is materialized explicitly to memory locations that is available at the time of computation while the frame-limited reuse analysis is about paring memory tokens available within the context to allocation sites. The latter requires more analysis along the control flow.
+3. bufferization eliminates allocations if the associated buffer is materialized explicitly to memory locations that is available at the time of computation while the frame-limited reuse analysis is about paring memory tokens available within the context to allocation sites. The former can obtain necessary information by looking at the destination buffer passed into the `linalg` operation. The latter requires more analysis along the control flow.
 
 = Future Works <future-works>
 Reuse analysis is developed with the persuit of performance and simplicity. However, RC-based approach is not without its limitations. In this chatper, we take a brief review of remaining issues and possible solutions. We hope to offer a glance at possible future development related to the inplace mutation of immutable objects. 
@@ -672,7 +672,7 @@ let freeze (r) =
   freeze_inner (r)
 ```
 
-To some extend, inplace mutation problem has similar characteristics of race-free mutations in concurrent programming. Such mutations are permissible if and only if the mutator holds the exclusive access to the underlying memory locations. Hence, the idea of having local mutable regions can be ported to general settings outside concurrent programming, as long as we clear isolation between mutation and immutable sections.
+To some extend, inplace mutation problem has similar characteristics of race-free mutations in concurrent programming. Such mutations are permissible if and only if the mutator holds the exclusive access to the underlying memory locations. Hence, the idea of having local mutable regions can be ported to general settings outside concurrent programming, as long as we have a clear isolation between mutable and immutable sections.
 
 We hope to practice this idea in functional programming. A mutable region, can be abstracted as a monad or a function with certain algebraic effect. When taking out the value from a mutable region, the freezing operation can be performed. 
 
@@ -693,7 +693,7 @@ We find the idea particularly interesting because it has minimal runtime implica
 == Loop Carried Exclusivity
 On the fastpaths with memory reuse, the RC-based approach can eliminate almost all overhead due to memory management. However, in some scenarios, the checking and branching remain to be  problematic.
 
-The following Lean4 code adds $1.0$ to all elements inside a `FloatArray` that stores elements in a fixed size contiguous memory area. 
+The following Lean4 code adds $1.0$ to all elements inside a `FloatArray` that stores elements in a fix-sized contiguous memory area. 
 
 ```lean
 partial def add1(x : FloatArray) : FloatArray :=
@@ -757,13 +757,47 @@ One needs to carefully arrange such passes.
 
 Although RC becomes efficient with reuse analysis, more overhead can be reduced by introducing borrowing. Such techiniques are used in Lean4 @lean-4 @ullrich2020countingimmutablebeansreference already. If we know the subroutines are only to do trivial operations, such as reading an integer out of the managed object, we do not need to hand over the ownership and introduce costly RC checkings. In Lean4, however, the reference type is not exposed to normal functional programming interfaces. Rather, they are only available when calling FFIs. We hope to expose the reference type directly as builtin language features.
 
-This introduces another opportunity that is not yet examined in existing implementations. If a locally created object is only passed as references, we do not even need to allocate the object on heap. We can promote it to the stack to avoid unnecessary allocation and deallocation operations.
+This introduces another opportunity that is not yet examined in existing implementations. If a locally created object is only passed as references, we do not even need to allocate the object on heap. We can promote it to the stack to avoid unnecessary allocation and deallocation operations. This is similar to the stack promotion pass in bufferization @Bufferization.
 
 == Unified Framework in MLIR
 
 The last point is more of practical values. Different forms of reuse analysis are used in both Lean4 and Koka without a unified playground similar to the MMTk project for the Garbage Collection Community @1317436. We hope to build up a framework with MLIR, as it provides handy dataflow analysis framework. The structured high-level operations can also be helpful when solving problems such as loop invariant hoisting. Being multi-leveled, once our IR framework is implemented, it immediately become available for others to utilize. Similarly, we may also benefit from the existing `linalg` and `tensor` dialect if we want to expose linear algebra features to our functonal languages.
 
-An interesting point to explore is whether the reuse analysis can be reformulated to a dataflow problem. Each drop operation adds in assignable tokens to the context while each allocation may consume such tokens. This assembles the generating and killing sets in iterative dataflow analysis (IDFA). In functional programming, the control flow graphs are of DAG forms. Therefore, there is no need to solve the problem with IDFA. Internalizing RC operations, however, should not be restricted to functional programming, but one may need to think about implications of complex dataflows. The bufferization pipeline discussed above may provide hints on implementations but the memory reuse tokens are "nullable" so when joining them across different flows, it may be harder to keep track of the best assignment that maximize the possibility of successful reuse.
+An interesting point to explore is whether the reuse analysis can be reformulated to a dataflow problem. Each drop operation adds in assignable tokens to the context while each allocation may consume such tokens. This assembles the generating and killing sets in iterative dataflow analysis (IDFA). To fuse the RC increment of fields with the destruction of their container, one can combine alias analysis and dominance analysis. If the source container from which the field is projected is an precise alias of the RC pointer being released and if the increment dominates the destruction in dataflow, then one can cancel the increment with the decrement inside the destruction. 
+
+```asm
+# Demo of acquire-release fusion in MLIR
+func.func @fusion(%0: !box) -> !rc {
+  %ref = reuse_ir.rc.borrow %0 : !box -> !ref
+  %proj = reuse_ir.proj %ref [1] : !ref -> !refrc
+  %valrc = reuse_ir.load %proj : !refrc -> !rc
+  %proj2 = reuse_ir.proj %ref [2] : !ref -> !refrc
+  %valrc2 = reuse_ir.load %proj2 : !refrc -> !rc
+  reuse_ir.rc.acquire (%valrc2 : !rc)
+  reuse_ir.rc.acquire (%valrc : !rc)
+  %tk = reuse_ir.rc.release (%0 : !box) : !reuse_ir.nullable<!tk1>
+  %tk2 = reuse_ir.rc.release (%valrc2 : !rc) : !reuse_ir.nullable<!tk2>
+  reuse_ir.token.free (%tk : !reuse_ir.nullable<!tk1>)
+  reuse_ir.token.free (%tk2 : !reuse_ir.nullable<!tk2>)
+  return %valrc : !rc
+}
+# After fusion
+func.func @fusion(%0: !box) -> !rc {
+  %ref = reuse_ir.rc.borrow %0 : !box -> !ref
+  %proj = reuse_ir.proj %ref [1] : !ref -> !refrc
+  %valrc = reuse_ir.load %proj : !refrc -> !rc
+  %proj2 = reuse_ir.proj %ref [2] : !ref -> !refrc
+  %valrc2 = reuse_ir.load %proj2 : !refrc -> !rc
+  # fused attribute indicate that fields at certain indices no longer require destruction
+  %tk = reuse_ir.rc.release (%0 : !box) fused(1, 2) : !reuse_ir.nullable<!tk1>
+  %tk2 = reuse_ir.rc.release (%valrc2 : !rc) : !reuse_ir.nullable<!tk2>
+  reuse_ir.token.free (%tk : !reuse_ir.nullable<!tk1>)
+  reuse_ir.token.free (%tk2 : !reuse_ir.nullable<!tk2>)
+  return %valrc : !rc
+}
+```
+
+In functional programming, the control flow graphs are of DAG forms. Therefore, there is no need to solve the problem with IDFA. Internalizing RC operations, however, should not be restricted to functional programming, but one may need to think about implications of complex dataflows. The bufferization pipeline discussed above may provide hints on implementations but the memory reuse tokens are "nullable" so when joining them across different flows, it may be harder to keep track of the best assignment that maximize the possibility of successful reuse.
 
 == Locality Implications of Memory Reuse
 
@@ -781,7 +815,7 @@ To reduce overhead of reference counting, reuse analysis further differentiate t
 
 For example, by monitoring allocation frequency, one may be able to tell whether a program is updating a sparse data structure or a dense one. Such differences may lead to further information leakage. Unlike GC or other deferred approaches, RC-based memory reclamation happens timely, which gives more opportunities for observers to infer the information out of the running programs.
 
-Currently, reuse analysis is still being adopted into various languages. If there is any security-critical program to be implemented with reuse analysis, one may need to study how to mask certain allocation patterns by probabilistically reject a reuse opportunity. There may be tradeoff between the performance and the security.
+Currently, reuse analysis is still being adopted into various languages. If there is any security-critical program to be implemented with reuse analysis, one may need to study how to mask certain allocation patterns by probabilistically reject a reuse opportunity. There may be a tradeoff between the performance and the security.
 
 = Conclusions
 
