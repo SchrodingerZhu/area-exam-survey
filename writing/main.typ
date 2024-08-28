@@ -39,11 +39,11 @@
 
 = Introduction
 
-This survery tries to bring together two seemingly exclusive concepts: *inplace mutations* and *immutable objects*. Immutable objects have been introduced into various languages due to their inherent memory safety and friendliness to static analyses @rust-affine @ullrich2020countingimmutablebeansreference @Verona. Functional languages, for example, can utilize the referential transparency implied by immutability to avoid repetitious evaluation. Rust and other memory-safe languages apply immutability to shared and concurrent objects to ensure soundness of memory operations.
+This survey tries to bring together two seemingly exclusive concepts: *inplace mutations* and *immutable objects*. Immutable objects have been introduced into various languages due to their inherent memory safety and friendliness to static analyses @rust-affine @ullrich2020countingimmutablebeansreference @Verona. Functional languages, for example, can utilize the referential transparency implied by immutability to avoid repetitious evaluation. Rust and other memory-safe languages apply immutability to shared and concurrent objects to ensure soundness of memory operations.
 
 Despite its elegance, immutability appears to be a double-edged sword. As for functional programming, many data structures and algorithms are complicated to implement in functional paradigm. Some may even be impossible to maintain its original efficiency when written in a purely functional style devoid of any inplace mutation. Performance for general situations may also be affected as it is no longer possible to apply inplace updates. Objects often need to be frequently constructed or destroyed in whole even though a state change only touchs partial fields.
 
-This survery wants to explore solutions to these problems. By studying exsiting works, we hope to answer two big questions regarding immutable objects:
+This survey wants to explore solutions to these problems. By studying exsiting works, we hope to answer two big questions regarding immutable objects:
 
 1. *Is it possible to achieve inplace mutability without breaking the "immutable views" of objects?* If this is possible, what efforts are needed for runtime and static analysis?
 
